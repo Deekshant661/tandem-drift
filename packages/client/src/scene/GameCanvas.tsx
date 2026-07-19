@@ -5,7 +5,8 @@ import { SkyDome } from './SkyDome.js';
 import { Ground } from './Ground.js';
 import { RoadMesh } from './RoadMesh.js';
 import { Gates } from './Gates.js';
-import { BoxCar } from './BoxCar.js';
+import { Vehicle } from './vehicle/Vehicle.js';
+import { compact01 } from './vehicle/spec.js';
 import { ChaseCamera } from './ChaseCamera.js';
 
 /**
@@ -40,7 +41,7 @@ export function GameCanvas({
       <Ground />
       <RoadMesh world={world} />
       <Gates client={client} world={world} />
-      <BoxCar client={client} />
+      <Vehicle client={client} spec={compact01} />
       <ChaseCamera client={client} />
     </Canvas>
   );

@@ -44,6 +44,13 @@ interface GameClientOpts {
  */
 export class GameClient {
   readonly poseRef: { current: VehicleSnapshot | null } = { current: null };
+  /** Latest applied control inputs (both seats combined), for animations. */
+  readonly controlsRef: {
+    current: { steer: number; throttle: number; brake: number; handbrake: boolean };
+  } = { current: { steer: 0, throttle: 0, brake: 0, handbrake: false } };
+  /** Collision impulse 0..1, set on snapshot velocity spikes; consumers decay it. */
+  readonly fxRef: { collision: number } = { collision: 0 };
+  private prevSnapVel: { vx: number; vy: number } | null = null;
 
   private state: GameState = {
     phase: 'lobby',
@@ -213,6 +220,23 @@ export class GameClient {
           const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
           this.snapshots.push(now, msg.vehicle);
           this.predictor?.onSnapshot(msg);
+          // Combined controls for animations (steering from pilot, pedals from engineer).
+          this.controlsRef.current = {
+            steer: msg.inputs.pilot.steer,
+            throttle: msg.inputs.engineer.throttle,
+            brake: msg.inputs.engineer.brake,
+            handbrake: msg.inputs.engineer.handbrake,
+          };
+          // Collision detection: a large velocity jump between consecutive
+          // snapshots (50 ms apart) means we hit something.
+          if (this.prevSnapVel) {
+            const dv = Math.hypot(
+              msg.vehicle.vx - this.prevSnapVel.vx,
+              msg.vehicle.vy - this.prevSnapVel.vy,
+            );
+            if (dv > 5) this.fxRef.collision = Math.min(1, dv / 15);
+          }
+          this.prevSnapVel = { vx: msg.vehicle.vx, vy: msg.vehicle.vy };
           this.setState({
             race: msg.race,
             speedKmh: Math.hypot(msg.vehicle.vx, msg.vehicle.vy) * 3.6,

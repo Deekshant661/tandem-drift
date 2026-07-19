@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { GameClient } from '../game/client.js';
@@ -13,19 +13,45 @@ export function ChaseCamera({ client }: { client: GameClient }): JSX.Element | n
   const look = useRef(new THREE.Vector3());
   const tmpTarget = useRef(new THREE.Vector3());
   const tmpAhead = useRef(new THREE.Vector3());
+  const lookBack = useRef(false);
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent): void => {
+      if (e.code === 'KeyC') lookBack.current = true;
+    };
+    const up = (e: KeyboardEvent): void => {
+      if (e.code === 'KeyC') lookBack.current = false;
+    };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+    };
+  }, []);
 
   useFrame(({ camera }, dt) => {
     const p = client.poseRef.current;
     if (!p) return;
     const speed = Math.hypot(p.vx, p.vy);
-    const fwdX = -Math.sin(p.angle);
-    const fwdZ = -Math.cos(p.angle);
+    // Hold C to look back: camera flips to the front, looking rearward.
+    const dir = lookBack.current ? -1 : 1;
+    const fwdX = -Math.sin(p.angle) * dir;
+    const fwdZ = -Math.cos(p.angle) * dir;
 
     const back = 9 + Math.min(4, speed * 0.12);
     tmpTarget.current.set(p.x - fwdX * back, 4.2 + speed * 0.03, -p.y - fwdZ * back);
     const k = 1 - Math.exp(-dt * 4); // frame-rate independent smoothing
     cur.current.lerp(tmpTarget.current, k);
     camera.position.copy(cur.current);
+
+    // Collision shake: random offset scaled by the decaying impulse.
+    const shake = client.fxRef.collision;
+    if (shake > 0.02) {
+      camera.position.x += (Math.random() - 0.5) * shake * 0.5;
+      camera.position.y += (Math.random() - 0.5) * shake * 0.35;
+      camera.position.z += (Math.random() - 0.5) * shake * 0.5;
+    }
 
     const aheadDist = 4 + speed * 0.15;
     tmpAhead.current.set(p.x + fwdX * aheadDist, 1.2, -p.y + fwdZ * aheadDist);
