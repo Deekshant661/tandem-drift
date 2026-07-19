@@ -704,22 +704,24 @@ This section turns the vision above into concrete, buildable decisions. Where
 it narrows something, it narrows scope per milestone — nothing in the vision
 is dropped, only sequenced.
 
-## A1. Renderer technology: vanilla Three.js, no React
+## A1. Renderer technology: React Three Fiber (as originally specified)
 
-The spec lists React Three Fiber. Amendment, for approval: use **plain
-Three.js in TypeScript** behind the renderer interface, without React/R3F.
+**Decision (user-confirmed): React + React Three Fiber**, with
+@react-three/drei for helpers and @react-three/postprocessing for effects.
 
-Reasons:
-- The client is vanilla TS with an existing, working frame loop and DOM HUD.
-  Introducing React solely to host a canvas adds a framework boundary,
-  reconciliation overhead, and ~45 kB gz for zero product benefit here.
-- The spec's own architecture goal — "renderer knows nothing about
-  networking; game state in → scene out" — is satisfied by a plain
-  `Renderer3D` class with `init(world)`, `update(pose, dtMs)`,
-  `setActiveGate(i)`.
-- R3F shines when UI and scene share reactive state; our HUD is deliberately
-  plain DOM. If a rich UI phase arrives later, React can wrap the HUD without
-  touching the renderer.
+Rationale: this is a long-lived project. R3F buys component architecture for
+scenes, a large ecosystem (drei, postprocessing, loaders), easier future
+menus/HUD/settings as React components, and easier contribution. The
+performance delta is negligible for this game.
+
+Integration contract (keeps "renderer knows nothing about networking"):
+- The React tree owns the canvas, scene, HUD, lobby, and pause menu.
+- Networking (Connection/Predictor/SnapshotBuffer) stays in plain TS modules;
+  a thin `useGameClient()` hook exposes their state to React via an external
+  store (`useSyncExternalStore`). Per-frame vehicle pose flows through a
+  mutable ref sampled in `useFrame` — never through React state (no
+  re-renders at 60 fps).
+- Gameplay/shared/server code has zero React imports.
 
 ## A2. World format (fulfils "Map Architecture" + "Terrain")
 
@@ -758,36 +760,54 @@ interface Road {
 ## A3. Asset & rig abstractions
 
 - `RenderableAsset`: every scenery/vehicle/character factory returns
-  `{ object3D: THREE.Object3D }` from a typed descriptor. Phase 2 factories
-  are procedural; a GLTF-backed factory can implement the same interface
-  later (per spec's Asset Pipeline).
+  `{ object3D: THREE.Object3D }` from a typed descriptor. **The renderer
+  natively supports BOTH procedural meshes and GLTF models from day one**:
+  each asset descriptor is `{ kind: 'procedural', build: ... }` or
+  `{ kind: 'gltf', url: ... }`, resolved by one loader component. Procedural
+  and GLTF assets mix freely (procedural trees + GLTF car is a valid scene).
 - `VehicleAsset` is data-driven: chassis dimensions, palette, wheel layout,
-  light positions come from a `VehicleSpec` object — one spec ("beetle")
-  ships now; trucks/vans later are new specs.
+  light positions come from a `VehicleSpec` object — one spec, named
+  **`compact01`** (generic; no real-world vehicle names), ships now;
+  trucks/vans later are new specs.
 - `CharacterRig` exactly as the spec's Characters section.
+- **Asset folder structure** exists from day one, even while mostly empty:
+
+  ```
+  packages/client/public/assets/
+      models/{vehicles,characters,buildings,props}/
+      textures/  sounds/  music/  shaders/  materials/
+  ```
+
+- **World streaming readiness:** the renderer groups world content by zone
+  into independently mountable chunks, so future larger maps can load/unload
+  zones without architectural changes. No streaming is implemented in
+  phase 2 — only this grouping.
 
 ## A4. Scope tiers (what ships in phase 2 vs. explicitly deferred)
 
 **Must ship (M1–M4):** chase camera (follow, lag, rotation smoothing,
 dynamic FOV, shake on collision, look-back key); sun + ambient + soft car
-shadow + tone mapping + atmospheric fog; gradient sky with procedural clouds
-and mountain ring; full Willowbrook environment incl. props (cones, benches,
-mailboxes, signs, hay bales, crates, lamps, barns); vehicle with steering /
-wheel spin / suspension bob / body roll / brake & reverse lights /
-headlights; skid marks + tire smoke + dust + collision sparks; blob
-characters with all listed reactions; HUD redesign per layout (speedometer,
-room card, controls card); Web-Audio synth placeholders for engine / skid /
-collision / horn / UI click; lobby restyle with copy-link button.
+shadow + tone mapping + atmospheric fog; **subtle bloom** (sun + headlights,
+via @react-three/postprocessing — cheap, high polish); gradient sky with
+procedural clouds and mountain ring; full Willowbrook environment incl.
+props (cones, benches, mailboxes, signs, hay bales, crates, lamps, barns);
+vehicle with steering / wheel spin / suspension bob / body roll / brake &
+reverse lights / headlights; skid marks + tire smoke + dust + collision
+sparks; blob characters with all listed reactions; HUD redesign per layout —
+speedometer **with gear slot showing "D"** (future-proof for reverse/manual
+vehicles: UI never changes), room card, controls card; **minimal pause menu**
+(Esc): Resume · Leave Room · Settings (disabled) · Back to Menu; Web-Audio
+synth placeholders for engine / skid / collision / horn / UI click; lobby
+restyle with copy-link button.
 
-**Deferred (recorded, not built now):** SSAO and bloom (post-processing
-chain — revisit after a perf pass on real laptops); motion blur; HDR .hdr
-environment textures (gradient sky + fog achieve the look without asset
-downloads); turn indicators; gear display (car is single-speed); pause menu
-with settings (browser tab already pauses rendering; a settings menu needs
-persisted options first); countdown/mission HUD slots (rendered as empty
-regions, wired when modes exist); ready button (rooms auto-start today —
-changing that is a gameplay change, out of phase 2 scope per the spec's own
-"do not redesign gameplay" rule).
+**Deferred (recorded, not built now):** SSAO (revisit after a perf pass on
+real laptops); motion blur; HDR .hdr environment textures (gradient sky +
+fog achieve the look without asset downloads); turn indicators; functional
+settings screen (menu entry ships disabled; needs persisted options first);
+countdown/mission HUD slots (rendered as empty regions, wired when modes
+exist); ready button (rooms auto-start today — changing that is a gameplay
+change, out of phase 2 scope per the spec's own "do not redesign gameplay"
+rule); actual zone streaming (grouping only, per A3).
 
 Deferred items get interface hooks where cheap (e.g. the HUD reserves the
 top-center slot; the effects module is a registry new effects plug into).
@@ -811,13 +831,17 @@ frustum following the car; hemisphere ambient.
 ## A7. Milestone mapping (same 4 milestones, tiered)
 
 - **M1 Foundation:** WorldMap format + generators + tests; Willowbrook roads
-  authored (layout only); renderer with ground, sky, sun, fog, road mesh,
-  chase camera v1, placeholder box car; multiplayer drivable end-to-end.
-- **M2 Car & crew:** VehicleSpec beetle (wheels, suspension, roll, lights),
-  CharacterRig blobs with all reactions, camera v2 (shake, look-back).
-- **M3 World:** all Willowbrook zones + structures + props + scatter;
-  lighting/material polish; minimap.
-- **M4 Presentation & ship:** HUD + lobby redesign, audio synths, effects
-  (skids, smoke, dust, sparks), performance pass (instancing, merging,
-  culling verification), deploy, README/plan updates.
+  authored (layout only); React + R3F app shell replacing the vanilla entry;
+  asset folder structure + dual procedural/GLTF asset loader; renderer with
+  ground, sky, sun, fog, road mesh, chase camera v1, placeholder box car;
+  multiplayer drivable end-to-end.
+- **M2 Car & crew:** VehicleSpec compact01 (wheels, suspension, roll,
+  lights), CharacterRig blobs with all reactions, camera v2 (shake,
+  look-back).
+- **M3 World:** all Willowbrook zones + structures + props + scatter,
+  grouped by zone (streaming-ready); lighting/material polish + bloom;
+  minimap.
+- **M4 Presentation & ship:** HUD + lobby redesign (React), pause menu,
+  audio synths, effects (skids, smoke, dust, sparks), performance pass
+  (instancing, merging, culling verification), deploy, README/plan updates.
 
