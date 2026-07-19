@@ -4,46 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tandem Drift</title>
-    <style>
-      html, body { margin: 0; height: 100%; background: #10141c; color: #e8ecf2; font-family: system-ui, sans-serif; overflow: hidden; }
-      #hud { position: fixed; top: 12px; left: 12px; background: rgba(8, 10, 16, 0.75); padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.6; pointer-events: none; }
-      #hud .code { font-size: 20px; letter-spacing: 3px; font-weight: 700; color: #7dd3fc; }
-      #hud .seat-pilot { color: #fbbf24; font-weight: 600; }
-      #hud .seat-engineer { color: #34d399; font-weight: 600; }
-      #lobby { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(8, 10, 16, 0.92); z-index: 10; }
-      #lobby form { background: #161c28; border: 1px solid #2a3550; border-radius: 12px; padding: 28px 32px; width: 320px; display: flex; flex-direction: column; gap: 12px; }
-      #lobby h1 { margin: 0 0 4px; font-size: 22px; color: #7dd3fc; }
-      #lobby label { font-size: 13px; color: #9fb0c8; display: flex; flex-direction: column; gap: 4px; }
-      #lobby input, #lobby select { background: #0e1420; color: #e8ecf2; border: 1px solid #2a3550; border-radius: 6px; padding: 8px 10px; font-size: 15px; }
-      #lobby input#room-code { text-transform: uppercase; letter-spacing: 2px; }
-      #lobby button { padding: 10px; border: 0; border-radius: 6px; font-size: 15px; font-weight: 600; cursor: pointer; }
-      #lobby #create-btn { background: #0ea5e9; color: #04121c; }
-      #lobby #join-btn { background: #263145; color: #e8ecf2; }
-      #lobby .hint { font-size: 12px; color: #64748b; margin: 0; }
-    </style>
   </head>
   <body>
-    <div id="hud" hidden></div>
-    <div id="lobby">
-      <form>
-        <h1>Tandem Drift</h1>
-        <p class="hint">Two players, one car. Pilot steers; engineer drives.</p>
-        <label>Your name
-          <input id="player-name" maxlength="24" placeholder="Player" autocomplete="off" />
-        </label>
-        <label>Track (when creating)
-          <select id="map-select">
-            <option value="track01">First Date — wide &amp; friendly</option>
-            <option value="track02">The Squeeze — narrow &amp; mean</option>
-          </select>
-        </label>
-        <button id="create-btn" type="button">Create room</button>
-        <label>…or join with a code
-          <input id="room-code" maxlength="6" placeholder="ABC123" autocomplete="off" />
-        </label>
-        <button id="join-btn" type="button">Join room</button>
-      </form>
-    </div>
-    <script type="module" src="/src/main.ts"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
