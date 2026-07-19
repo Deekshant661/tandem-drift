@@ -18,6 +18,10 @@ Open http://localhost:5173 — a room is created and its code appears in the HUD
 (and in the URL). Open the same URL in a second tab/browser to take the second seat.
 
 **Controls** — Pilot: `A`/`D` steer. Engineer: `W` throttle, `S` brake, `Space` handbrake.
+`Tab` requests a seat swap (executes when both players request it).
+
+**Racing** — the room runs the "First Date" circuit: pass the glowing green gate
+next; lapping the yellow start/finish gate records last/best lap times in the HUD.
 
 ## Commands
 

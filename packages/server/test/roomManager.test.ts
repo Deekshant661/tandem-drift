@@ -56,6 +56,26 @@ describe('RoomManager / GameRoom lifecycle', () => {
     expect(mgr.getRoom(room.code)).toBeUndefined();
   });
 
+  it('swaps seats only when both players request it', () => {
+    const mgr = new RoomManager();
+    const room = mgr.createRoom();
+    const a = room.addPlayer('a', 'Ann', fakeSocket());
+    const b = room.addPlayer('b', 'Bo', fakeSocket());
+    expect(a.seat).toBe('pilot');
+
+    room.requestSeatSwap('a');
+    expect(a.seat).toBe('pilot'); // one request is not enough
+    room.requestSeatSwap('b');
+    expect(a.seat).toBe('engineer');
+    expect(b.seat).toBe('pilot');
+
+    // Requests are consumed: another single request does not swap again.
+    room.requestSeatSwap('a');
+    expect(a.seat).toBe('engineer');
+    room.removePlayer('a');
+    room.removePlayer('b');
+  });
+
   it('drops stale input sequence numbers', () => {
     const mgr = new RoomManager();
     const room = mgr.createRoom();

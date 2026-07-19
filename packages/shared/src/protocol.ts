@@ -52,7 +52,12 @@ export interface PingMsg {
   t: number;
 }
 
-export type ClientMsg = JoinMsg | InputMsg | PingMsg;
+/** Request to swap seats; takes effect when both players have requested it. */
+export interface SwapSeatsMsg {
+  type: 'swapSeats';
+}
+
+export type ClientMsg = JoinMsg | InputMsg | PingMsg | SwapSeatsMsg;
 
 // ---- server -> client ----
 
@@ -74,12 +79,28 @@ export interface RoomStateMsg {
   players: PlayerInfo[];
 }
 
+export interface RaceInfo {
+  lap: number;
+  nextCheckpoint: number;
+  currentLapMs: number;
+  lastLapMs: number | null;
+  bestLapMs: number | null;
+}
+
 export interface SnapshotMsg {
   type: 'snapshot';
   tick: number;
   vehicle: VehicleSnapshot;
   /** Last applied inputs, so each client can show the partner's controls. */
   inputs: { pilot: ControlInput; engineer: ControlInput };
+  race: RaceInfo;
+}
+
+/** Sent when a pending both-players seat swap completes. */
+export interface SeatSwappedMsg {
+  type: 'seatSwapped';
+  /** Your new seat, per recipient. */
+  seat: Seat;
 }
 
 export interface PongMsg {
@@ -87,7 +108,13 @@ export interface PongMsg {
   t: number;
 }
 
-export type ServerMsg = JoinedMsg | JoinErrorMsg | RoomStateMsg | SnapshotMsg | PongMsg;
+export type ServerMsg =
+  | JoinedMsg
+  | JoinErrorMsg
+  | RoomStateMsg
+  | SnapshotMsg
+  | PongMsg
+  | SeatSwappedMsg;
 
 // ---- codec ----
 
@@ -95,8 +122,15 @@ export function encode(msg: ClientMsg | ServerMsg): string {
   return JSON.stringify(msg);
 }
 
-const CLIENT_TYPES = new Set(['join', 'input', 'ping']);
-const SERVER_TYPES = new Set(['joined', 'joinError', 'roomState', 'snapshot', 'pong']);
+const CLIENT_TYPES = new Set(['join', 'input', 'ping', 'swapSeats']);
+const SERVER_TYPES = new Set([
+  'joined',
+  'joinError',
+  'roomState',
+  'snapshot',
+  'pong',
+  'seatSwapped',
+]);
 
 function parse(data: string, allowed: Set<string>): unknown | null {
   let obj: unknown;

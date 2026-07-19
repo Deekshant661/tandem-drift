@@ -4,6 +4,8 @@ import {
   createSimWorld,
   encode,
   NEUTRAL_INPUT,
+  RaceTracker,
+  track01,
   sanitizeInput,
   SIM_DT,
   SIM_HZ,
@@ -32,7 +34,10 @@ export interface RoomPlayer {
  */
 export class GameRoom {
   readonly code: string;
-  private readonly sim: SimWorld = createSimWorld();
+  private readonly map = track01();
+  private readonly sim: SimWorld = createSimWorld(this.map);
+  private readonly race = new RaceTracker(this.map.checkpoints);
+  private readonly swapRequests = new Set<string>();
   private readonly players = new Map<string, RoomPlayer>();
   private readonly inputs: Record<Seat, ControlInput> = {
     pilot: { ...NEUTRAL_INPUT },
@@ -75,6 +80,7 @@ export class GameRoom {
     const player = this.players.get(id);
     if (!player) return;
     this.players.delete(id);
+    this.swapRequests.delete(id);
     // A departed seat's controls go neutral immediately.
     this.inputs[player.seat] = { ...NEUTRAL_INPUT };
     if (this.players.size === 0) {
@@ -91,6 +97,30 @@ export class GameRoom {
     if (!player || seq <= player.lastInputSeq) return;
     player.lastInputSeq = seq;
     this.inputs[player.seat] = sanitizeInput(input);
+  }
+
+  /**
+   * Register a seat-swap request. The swap executes only when both seated
+   * players have requested it (mutual consent — one player can't yank the
+   * wheel away mid-corner). Both seats' controls reset to neutral on swap.
+   */
+  requestSeatSwap(playerId: string): void {
+    if (!this.players.has(playerId)) return;
+    this.swapRequests.add(playerId);
+    if (this.players.size < 2 || this.swapRequests.size < 2) return;
+
+    this.swapRequests.clear();
+    for (const p of this.players.values()) {
+      p.seat = p.seat === 'pilot' ? 'engineer' : 'pilot';
+    }
+    this.inputs.pilot = { ...NEUTRAL_INPUT };
+    this.inputs.engineer = { ...NEUTRAL_INPUT };
+    for (const p of this.players.values()) {
+      if (p.socket.readyState === p.socket.OPEN) {
+        p.socket.send(encode({ type: 'seatSwapped', seat: p.seat }));
+      }
+    }
+    this.broadcastRoomState();
   }
 
   getPlayers(): PlayerInfo[] {
@@ -122,12 +152,15 @@ export class GameRoom {
   private stepOnce(): void {
     stepSim(this.sim, combineSeatInputs(this.inputs.pilot, this.inputs.engineer), SIM_DT);
     this.tick++;
+    const vehicle = snapshotVehicle(this.sim);
+    this.race.update(vehicle.x, vehicle.y, this.tick);
     if (this.tick % SNAPSHOT_EVERY_TICKS === 0) {
       this.broadcast({
         type: 'snapshot',
         tick: this.tick,
-        vehicle: snapshotVehicle(this.sim),
+        vehicle,
         inputs: { pilot: this.inputs.pilot, engineer: this.inputs.engineer },
+        race: this.race.state(this.tick),
       });
     }
   }

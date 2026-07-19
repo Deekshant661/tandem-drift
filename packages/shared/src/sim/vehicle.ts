@@ -12,7 +12,8 @@
  */
 import { World, Body, Vec2, Box, Edge } from 'planck';
 import type { ControlInput, VehicleSnapshot } from '../protocol.js';
-import { ARENA_WIDTH, ARENA_HEIGHT } from '../constants.js';
+import type { TrackMap } from '../maps/types.js';
+import { arenaMap } from '../maps/maps.js';
 
 export const VEHICLE_TUNING = {
   /** Chassis half-extents, meters. */
@@ -40,25 +41,22 @@ export interface SimWorld {
   vehicle: Body;
 }
 
-/** Build the walled arena and one vehicle at the center. */
-export function createSimWorld(): SimWorld {
+/** Build a map's walls and one vehicle at its spawn. Defaults to the open test arena. */
+export function createSimWorld(map: TrackMap = arenaMap()): SimWorld {
   const world = new World({ gravity: new Vec2(0, 0) });
 
   const walls = world.createBody({ type: 'static' });
-  const w = ARENA_WIDTH / 2;
-  const h = ARENA_HEIGHT / 2;
-  const corners = [new Vec2(-w, -h), new Vec2(w, -h), new Vec2(w, h), new Vec2(-w, h)];
-  for (let i = 0; i < 4; i++) {
+  for (const seg of map.walls) {
     walls.createFixture({
-      shape: new Edge(corners[i]!, corners[(i + 1) % 4]!),
+      shape: new Edge(new Vec2(seg.x1, seg.y1), new Vec2(seg.x2, seg.y2)),
       restitution: 0.4,
     });
   }
 
   const vehicle = world.createBody({
     type: 'dynamic',
-    position: new Vec2(0, 0),
-    angle: 0,
+    position: new Vec2(map.spawn.x, map.spawn.y),
+    angle: map.spawn.angle,
     linearDamping: VEHICLE_TUNING.linearDamping,
     angularDamping: VEHICLE_TUNING.angularDamping,
   });

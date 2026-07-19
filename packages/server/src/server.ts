@@ -78,6 +78,9 @@ export function createGameServer(): GameServer {
         case 'ping':
           socket.send(encode({ type: 'pong', t: msg.t }));
           break;
+        case 'swapSeats':
+          state.room?.requestSeatSwap(state.playerId);
+          break;
       }
     });
 
