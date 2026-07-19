@@ -46,6 +46,35 @@ describe('SnapshotBuffer', () => {
   });
 });
 
+describe('adaptive delay', () => {
+  it('stays fixed unless enabled', () => {
+    const buf = new SnapshotBuffer(100);
+    for (let i = 0; i < 30; i++) buf.push(i * 50, snap(i));
+    expect(buf.currentDelayMs).toBe(100);
+  });
+
+  it('drifts down toward a low-jitter target', () => {
+    const buf = new SnapshotBuffer(200);
+    buf.enableAdaptiveDelay();
+    // Perfectly regular 50 ms arrivals → target ≈ 60 ms (clamp floor).
+    for (let i = 0; i < 200; i++) buf.push(i * 50, snap(i));
+    expect(buf.currentDelayMs).toBeLessThan(100);
+    expect(buf.currentDelayMs).toBeGreaterThanOrEqual(60);
+  });
+
+  it('rises under heavy jitter but stays clamped', () => {
+    const buf = new SnapshotBuffer(60);
+    buf.enableAdaptiveDelay();
+    let t = 0;
+    for (let i = 0; i < 300; i++) {
+      t += i % 2 === 0 ? 10 : 240; // wildly alternating gaps
+      buf.push(t, snap(i));
+    }
+    expect(buf.currentDelayMs).toBeGreaterThan(100);
+    expect(buf.currentDelayMs).toBeLessThanOrEqual(300);
+  });
+});
+
 describe('lerpAngle', () => {
   it('takes the short way across the ±π seam', () => {
     const a = Math.PI - 0.1;

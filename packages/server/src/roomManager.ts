@@ -12,6 +12,12 @@ export class RoomManager {
     return this.rooms.size;
   }
 
+  get playerCount(): number {
+    let n = 0;
+    for (const room of this.rooms.values()) n += room.playerCount;
+    return n;
+  }
+
   createRoom(): GameRoom {
     let code: string;
     do {

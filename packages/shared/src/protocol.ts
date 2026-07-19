@@ -4,6 +4,8 @@
  */
 
 export type Seat = 'pilot' | 'engineer';
+/** A connection's role in a room: one of the two seats, or a watch-only spectator. */
+export type Role = Seat | 'spectator';
 
 /** Full control input. The server only reads the fields owned by the sender's seat. */
 export interface ControlInput {
@@ -28,7 +30,7 @@ export interface VehicleSnapshot {
 
 export interface PlayerInfo {
   id: string;
-  seat: Seat;
+  role: Role;
   name: string;
 }
 
@@ -39,6 +41,8 @@ export interface JoinMsg {
   /** Omit to create a new room. */
   roomCode?: string;
   name: string;
+  /** Reconnection token from a previous `joined` message; reclaims the old seat. */
+  token?: string;
 }
 
 export interface InputMsg {
@@ -65,8 +69,10 @@ export interface JoinedMsg {
   type: 'joined';
   roomCode: string;
   playerId: string;
-  seat: Seat;
+  role: Role;
   tick: number;
+  /** Present this token on a future join to reclaim the seat after a disconnect. */
+  token: string;
 }
 
 export interface JoinErrorMsg {
@@ -163,7 +169,11 @@ export function decodeClientMsg(data: string): ClientMsg | null {
       return null;
     }
   }
-  if (obj.type === 'join' && typeof obj.name !== 'string') return null;
+  if (obj.type === 'join') {
+    if (typeof obj.name !== 'string') return null;
+    if (obj.token !== undefined && typeof obj.token !== 'string') return null;
+    if (obj.roomCode !== undefined && typeof obj.roomCode !== 'string') return null;
+  }
   if (obj.type === 'ping' && typeof obj.t !== 'number') return null;
   return obj;
 }

@@ -1,7 +1,7 @@
 import { createServer, type Server as HttpServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { decodeClientMsg, encode, MAX_PLAYERS_PER_ROOM } from '@tandem/shared';
+import { decodeClientMsg, encode } from '@tandem/shared';
 import { RoomManager } from './roomManager.js';
 import type { GameRoom } from './gameRoom.js';
 
@@ -21,10 +21,18 @@ export interface GameServer {
 export function createGameServer(): GameServer {
   const rooms = new RoomManager();
 
+  const startedAt = Date.now();
   const http = createServer((req, res) => {
     if (req.url === '/healthz') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, rooms: rooms.roomCount }));
+      res.end(
+        JSON.stringify({
+          ok: true,
+          rooms: rooms.roomCount,
+          players: rooms.playerCount,
+          uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
+        }),
+      );
       return;
     }
     res.writeHead(404);
@@ -52,21 +60,32 @@ export function createGameServer(): GameServer {
               socket.send(encode({ type: 'joinError', reason: 'not_found' }));
               return;
             }
-            if (room.playerCount >= MAX_PLAYERS_PER_ROOM) {
+          }
+          const name = msg.name.trim().slice(0, 24) || 'Player';
+
+          // A valid reconnection token reclaims the reserved seat; otherwise
+          // this is a normal join (seat if available, spectator if not).
+          let player =
+            msg.token !== undefined
+              ? room.reclaimSeat(msg.token, state.playerId, socket)
+              : null;
+          if (!player) {
+            try {
+              player = room.addPlayer(state.playerId, name, socket);
+            } catch {
               socket.send(encode({ type: 'joinError', reason: 'full' }));
               return;
             }
           }
-          const name = msg.name.trim().slice(0, 24) || 'Player';
-          const player = room.addPlayer(state.playerId, name, socket);
           state.room = room;
           socket.send(
             encode({
               type: 'joined',
               roomCode: room.code,
               playerId: player.id,
-              seat: player.seat,
+              role: player.role,
               tick: room.currentTick,
+              token: player.token,
             }),
           );
           room.broadcastRoomState();
@@ -85,7 +104,7 @@ export function createGameServer(): GameServer {
     });
 
     socket.on('close', () => {
-      state.room?.removePlayer(state.playerId);
+      state.room?.handleDisconnect(state.playerId);
       state.room = null;
     });
 

@@ -25,14 +25,45 @@ export function lerpAngle(a: number, b: number, t: number): number {
  */
 export class SnapshotBuffer {
   private readonly buffer: TimedSnapshot[] = [];
-  private readonly delayMs: number;
+  private delayMs: number;
   private readonly maxSize = 64;
+  /** Recent inter-arrival gaps for jitter estimation. */
+  private readonly gaps: number[] = [];
+  private lastArrival: number | null = null;
+  private adaptive = false;
 
   constructor(delayMs: number) {
     this.delayMs = delayMs;
   }
 
+  /**
+   * Enable adaptive delay: the interpolation delay tracks measured snapshot
+   * inter-arrival jitter (mean gap + 2.5 sigma, clamped to [60, 300] ms), so
+   * clean connections get lower latency and jittery ones stop stuttering.
+   */
+  enableAdaptiveDelay(): void {
+    this.adaptive = true;
+  }
+
+  get currentDelayMs(): number {
+    return this.delayMs;
+  }
+
   push(time: number, vehicle: VehicleSnapshot): void {
+    if (this.lastArrival !== null) {
+      this.gaps.push(time - this.lastArrival);
+      if (this.gaps.length > 40) this.gaps.shift();
+      if (this.adaptive && this.gaps.length >= 10) {
+        const mean = this.gaps.reduce((a, b) => a + b, 0) / this.gaps.length;
+        const variance =
+          this.gaps.reduce((a, b) => a + (b - mean) * (b - mean), 0) / this.gaps.length;
+        const target = mean + 2.5 * Math.sqrt(variance);
+        const clamped = Math.min(300, Math.max(60, target));
+        // Move gently toward the target so the car never visibly jumps in time.
+        this.delayMs += (clamped - this.delayMs) * 0.05;
+      }
+    }
+    this.lastArrival = time;
     this.buffer.push({ time, vehicle });
     if (this.buffer.length > this.maxSize) this.buffer.shift();
   }

@@ -15,5 +15,4 @@ export const INTERPOLATION_DELAY_MS = 100;
 export const ARENA_WIDTH = 120;
 export const ARENA_HEIGHT = 80;
 
-export const MAX_PLAYERS_PER_ROOM = 2;
 export const ROOM_CODE_LENGTH = 6;

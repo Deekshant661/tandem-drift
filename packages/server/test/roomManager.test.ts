@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RoomManager } from '../src/roomManager.js';
+import { MAX_SPECTATORS, RECONNECT_GRACE_MS } from '../src/gameRoom.js';
 import type { WebSocket } from 'ws';
 
 function fakeSocket(): WebSocket {
@@ -22,16 +23,77 @@ describe('RoomManager / GameRoom lifecycle', () => {
     expect(mgr.getRoom('NOPE99')).toBeUndefined();
   });
 
-  it('assigns pilot then engineer, and rejects a third player', () => {
+  it('assigns pilot, then engineer, then spectators up to the cap', () => {
     const mgr = new RoomManager();
     const room = mgr.createRoom();
     const a = room.addPlayer('a', 'Ann', fakeSocket());
     const b = room.addPlayer('b', 'Bo', fakeSocket());
-    expect(a.seat).toBe('pilot');
-    expect(b.seat).toBe('engineer');
-    expect(() => room.addPlayer('c', 'Cy', fakeSocket())).toThrow(/full/);
-    room.removePlayer('a');
-    room.removePlayer('b');
+    expect(a.role).toBe('pilot');
+    expect(b.role).toBe('engineer');
+    for (let i = 0; i < MAX_SPECTATORS; i++) {
+      expect(room.addPlayer(`s${i}`, `Spec${i}`, fakeSocket()).role).toBe('spectator');
+    }
+    expect(() => room.addPlayer('overflow', 'Nope', fakeSocket())).toThrow(/full/);
+    for (const id of ['a', 'b', ...Array.from({ length: MAX_SPECTATORS }, (_, i) => `s${i}`)]) {
+      room.removePlayer(id);
+    }
+  });
+
+  it('reserves a dropped seat during the reconnect grace and restores it by token', () => {
+    vi.useFakeTimers();
+    try {
+      const mgr = new RoomManager();
+      const room = mgr.createRoom();
+      const a = room.addPlayer('a', 'Ann', fakeSocket());
+      room.addPlayer('b', 'Bo', fakeSocket());
+
+      room.handleDisconnect('a');
+      // Seat is held: a new joiner becomes a spectator, not the pilot.
+      expect(room.addPlayer('c', 'Cy', fakeSocket()).role).toBe('spectator');
+
+      const restored = room.reclaimSeat(a.token, 'a2', fakeSocket());
+      expect(restored?.role).toBe('pilot');
+      expect(restored?.name).toBe('Ann');
+
+      room.removePlayer('a2');
+      room.removePlayer('b');
+      room.removePlayer('c');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('frees the seat and GCs the room after the grace expires', () => {
+    vi.useFakeTimers();
+    try {
+      const mgr = new RoomManager();
+      const room = mgr.createRoom();
+      const a = room.addPlayer('a', 'Ann', fakeSocket());
+      room.handleDisconnect('a');
+      // Room survives while a reconnect is possible.
+      expect(mgr.roomCount).toBe(1);
+
+      vi.advanceTimersByTime(RECONNECT_GRACE_MS + 1);
+      expect(mgr.roomCount).toBe(0);
+      expect(room.reclaimSeat(a.token, 'a2', fakeSocket())).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ignores inputs and swap requests from spectators', () => {
+    const mgr = new RoomManager();
+    const room = mgr.createRoom();
+    const a = room.addPlayer('a', 'Ann', fakeSocket());
+    room.addPlayer('b', 'Bo', fakeSocket());
+    room.addPlayer('s', 'Spec', fakeSocket());
+
+    room.applyInput('s', 1, { steer: 1, throttle: 1, brake: 0, handbrake: false });
+    room.requestSeatSwap('s');
+    room.requestSeatSwap('b');
+    expect(a.role).toBe('pilot'); // spectator's request must not count toward the swap
+
+    for (const id of ['a', 'b', 's']) room.removePlayer(id);
   });
 
   it('reassigns the vacated pilot seat to the next joiner', () => {
@@ -41,7 +103,7 @@ describe('RoomManager / GameRoom lifecycle', () => {
     room.addPlayer('b', 'Bo', fakeSocket());
     room.removePlayer('a');
     const c = room.addPlayer('c', 'Cy', fakeSocket());
-    expect(c.seat).toBe('pilot');
+    expect(c.role).toBe('pilot');
     room.removePlayer('b');
     room.removePlayer('c');
   });
@@ -61,17 +123,17 @@ describe('RoomManager / GameRoom lifecycle', () => {
     const room = mgr.createRoom();
     const a = room.addPlayer('a', 'Ann', fakeSocket());
     const b = room.addPlayer('b', 'Bo', fakeSocket());
-    expect(a.seat).toBe('pilot');
+    expect(a.role).toBe('pilot');
 
     room.requestSeatSwap('a');
-    expect(a.seat).toBe('pilot'); // one request is not enough
+    expect(a.role).toBe('pilot'); // one request is not enough
     room.requestSeatSwap('b');
-    expect(a.seat).toBe('engineer');
-    expect(b.seat).toBe('pilot');
+    expect(a.role).toBe('engineer');
+    expect(b.role).toBe('pilot');
 
     // Requests are consumed: another single request does not swap again.
     room.requestSeatSwap('a');
-    expect(a.seat).toBe('engineer');
+    expect(a.role).toBe('engineer');
     room.removePlayer('a');
     room.removePlayer('b');
   });

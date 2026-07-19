@@ -23,6 +23,11 @@ Open http://localhost:5173 — a room is created and its code appears in the HUD
 **Racing** — the room runs the "First Date" circuit: pass the glowing green gate
 next; lapping the yellow start/finish gate records last/best lap times in the HUD.
 
+**Robustness** — if a driver drops, their seat is reserved for 30 s and reclaimed
+automatically on reconnect (the client retries with a session token). Extra
+joiners beyond the two seats become spectators (up to 8). The interpolation
+delay adapts to measured network jitter.
+
 ## Commands
 
 | Command | What |

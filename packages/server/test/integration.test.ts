@@ -89,14 +89,14 @@ describe('server integration over real websockets', () => {
     await pilot.open();
     pilot.send({ type: 'join', name: 'Pilot' });
     const joined = await pilot.nextOfType('joined');
-    expect(joined.seat).toBe('pilot');
+    expect(joined.role).toBe('pilot');
     expect(joined.roomCode).toMatch(/^[A-Z2-9]{6}$/);
 
     const engineer = new TestClient(port);
     await engineer.open();
     engineer.send({ type: 'join', name: 'Engineer', roomCode: joined.roomCode });
     const joined2 = await engineer.nextOfType('joined');
-    expect(joined2.seat).toBe('engineer');
+    expect(joined2.role).toBe('engineer');
     expect(joined2.roomCode).toBe(joined.roomCode);
 
     const roster = await engineer.nextOfType('roomState');
@@ -125,7 +125,7 @@ describe('server integration over real websockets', () => {
     expect(pilotSnap.vehicle).toBeDefined();
   });
 
-  it('rejects joins to unknown and full rooms', async () => {
+  it('rejects unknown rooms and seats extras as spectators', async () => {
     const port = start();
 
     const ghost = new TestClient(port);
@@ -145,7 +145,39 @@ describe('server integration over real websockets', () => {
     const c = new TestClient(port);
     await c.open();
     c.send({ type: 'join', name: 'C', roomCode });
-    expect((await c.nextOfType('joinError')).reason).toBe('full');
+    const spec = await c.nextOfType('joined');
+    expect(spec.role).toBe('spectator');
+    // Spectators receive the stream too.
+    expect((await c.nextOfType('snapshot')).vehicle).toBeDefined();
+  });
+
+  it('lets a dropped player reclaim their seat with the reconnect token', async () => {
+    const port = start();
+
+    const a = new TestClient(port);
+    await a.open();
+    a.send({ type: 'join', name: 'Ann' });
+    const joined = await a.nextOfType('joined');
+    expect(joined.role).toBe('pilot');
+
+    const b = new TestClient(port);
+    await b.open();
+    b.send({ type: 'join', name: 'Bo', roomCode: joined.roomCode });
+    await b.nextOfType('joined');
+
+    a.close();
+    // While Ann's seat is reserved, a stranger becomes a spectator.
+    const stranger = new TestClient(port);
+    await stranger.open();
+    stranger.send({ type: 'join', name: 'Sly', roomCode: joined.roomCode });
+    expect((await stranger.nextOfType('joined')).role).toBe('spectator');
+
+    const a2 = new TestClient(port);
+    await a2.open();
+    a2.send({ type: 'join', name: 'Ann', roomCode: joined.roomCode, token: joined.token });
+    const rejoined = await a2.nextOfType('joined');
+    expect(rejoined.role).toBe('pilot');
+    expect(rejoined.token).toBe(joined.token);
   });
 
   it('answers pings and survives malformed messages', async () => {
