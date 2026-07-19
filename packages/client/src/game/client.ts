@@ -13,7 +13,7 @@ import { Connection } from '../net/connection.js';
 import { SnapshotBuffer } from '../net/interpolation.js';
 import { Predictor } from '../net/prediction.js';
 import { KeyboardInput } from '../input/keyboard.js';
-import { EngineAudio } from '../audio/engine.js';
+import { AudioManager } from '../audio/manager.js';
 
 const SERVER_URL =
   (import.meta.env?.VITE_SERVER_URL as string | undefined) ?? 'ws://localhost:8080';
@@ -69,7 +69,8 @@ export class GameClient {
   private snapshots = new SnapshotBuffer(INTERPOLATION_DELAY_MS);
   private predictor: Predictor | null = null;
   private readonly keyboard: KeyboardInput | null;
-  private readonly audio: EngineAudio | null;
+  /** Public so UI components can play clicks. */
+  readonly audio: AudioManager | null;
   private joinOpts: { name: string; roomCode?: string; map: string } | null = null;
   private inputSeq = 0;
   private reconnectAttempts = 0;
@@ -80,7 +81,7 @@ export class GameClient {
     this.createConnection = opts.createConnection ?? ((url) => new Connection(url));
     const hasDom = typeof window !== 'undefined';
     this.keyboard = hasDom ? new KeyboardInput() : null;
-    this.audio = hasDom ? new EngineAudio() : null;
+    this.audio = hasDom ? new AudioManager() : null;
     this.snapshots.enableAdaptiveDelay();
 
     if (hasDom) {
@@ -89,6 +90,9 @@ export class GameClient {
         if (e.code === 'Tab') {
           e.preventDefault();
           this.requestSwap();
+        }
+        if (e.code === 'KeyH' && !e.repeat && this.state.phase === 'playing') {
+          this.audio?.horn();
         }
       });
       // If the URL carries a room code (shared link), auto-join.
@@ -234,7 +238,10 @@ export class GameClient {
               msg.vehicle.vx - this.prevSnapVel.vx,
               msg.vehicle.vy - this.prevSnapVel.vy,
             );
-            if (dv > 5) this.fxRef.collision = Math.min(1, dv / 15);
+            if (dv > 5) {
+              this.fxRef.collision = Math.min(1, dv / 15);
+              this.audio?.collision(this.fxRef.collision);
+            }
           }
           this.prevSnapVel = { vx: msg.vehicle.vx, vy: msg.vehicle.vy };
           this.setState({
@@ -258,7 +265,7 @@ export class GameClient {
     }, 1000 / INPUT_SEND_HZ);
     this.hudTimer = setInterval(() => {
       this.setState({ rttMs: this.conn?.rttMs ?? 0 });
-      this.audio?.update(this.state.speedKmh / 3.6);
+      this.audio?.update(this.state.speedKmh / 3.6, this.controlsRef.current.handbrake);
     }, 250);
   }
 
