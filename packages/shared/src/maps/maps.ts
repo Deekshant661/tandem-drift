@@ -1,5 +1,8 @@
 import { ARENA_HEIGHT, ARENA_WIDTH } from '../constants.js';
 import type { TrackMap, WallSegment } from './types.js';
+import type { WorldMap } from '../world/types.js';
+import { worldToTrackMap } from '../world/generate.js';
+import { willowbrook } from '../world/willowbrook.js';
 
 /** Chain a closed polygon of points into wall segments. */
 function ring(points: Array<[number, number]>): WallSegment[] {
@@ -57,9 +60,15 @@ export function track02(): TrackMap {
 export const PLAYABLE_MAPS: Record<string, () => TrackMap> = {
   track01,
   track02,
+  willowbrook: () => worldToTrackMap(willowbrook()),
 };
 
-export const DEFAULT_MAP = 'track01';
+export const DEFAULT_MAP = 'willowbrook';
+
+/** 3D world description for a map, or null for legacy 2D-only maps. */
+export function getWorld(name: string): WorldMap | null {
+  return name === 'willowbrook' ? willowbrook() : null;
+}
 
 /** Resolve a playable map by name, falling back to the default. */
 export function getMap(name: string | undefined): TrackMap {

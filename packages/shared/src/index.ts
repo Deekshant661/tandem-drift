@@ -4,3 +4,8 @@ export * from './sim/vehicle.js';
 export * from './sim/race.js';
 export * from './maps/types.js';
 export * from './maps/maps.js';
+export * from './rng.js';
+export * from './world/types.js';
+export * from './world/spline.js';
+export * from './world/generate.js';
+export * from './world/willowbrook.js';
