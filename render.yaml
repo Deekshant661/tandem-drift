@@ -1,0 +1,11 @@
+# Render blueprint: deploys the authoritative game server from the Dockerfile.
+# Connect the GitHub repo at https://dashboard.render.com → New → Blueprint.
+services:
+  - type: web
+    name: tandem-drift-server
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: PORT
+        value: "8080"
