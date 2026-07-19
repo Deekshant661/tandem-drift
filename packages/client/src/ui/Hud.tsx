@@ -94,9 +94,13 @@ export function Hud({ client }: { client: GameClient }): JSX.Element | null {
       <Speedometer client={client} />
       {/* bottom-right area holds the minimap (App) + controls card */}
       <div className="hud-card controls-card">
-        {s.role === 'pilot' && <span>A/D steer · Tab swap · C look back · H horn · Esc menu</span>}
+        {s.role === 'pilot' && (
+          <span>A/D steer · R recover · Tab swap · C look back · H horn · Esc menu</span>
+        )}
         {s.role === 'engineer' && (
-          <span>W gas · S brake · Space drift · Tab swap · C look back · H horn · Esc menu</span>
+          <span>
+            W gas · S brake · Space drift · R recover · Tab swap · C look back · H horn · Esc menu
+          </span>
         )}
         {s.role === 'spectator' && <span>Spectating · Esc menu</span>}
       </div>

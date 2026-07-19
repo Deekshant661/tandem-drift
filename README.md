@@ -21,9 +21,15 @@ room; its code appears in the HUD (and in the URL). Open the same URL in a
 second tab/browser to take the second seat.
 
 **Controls** — Pilot: `A`/`D` steer. Engineer: `W` throttle, `S` brake, `Space` handbrake.
+`R` recover (respawns at the last checkpoint, facing the right way) ·
 `Tab` seat swap (both must press) · `C` look back · `H` horn · `Esc` pause menu ·
 `P` toggles a live performance overlay (FPS, frame time, draw calls, triangles,
 GPU resource counts, JS heap).
+
+**Recovery** — press R any time to respawn at your last passed checkpoint. If
+the car sits nearly still for a few seconds, a "Press R to Recover" hint
+appears. A server-side safety net also auto-recovers the car if it somehow
+ends up implausibly far from the playable world.
 
 **Racing** — the room runs the "First Date" circuit: pass the glowing green gate
 next; lapping the yellow start/finish gate records last/best lap times in the HUD.

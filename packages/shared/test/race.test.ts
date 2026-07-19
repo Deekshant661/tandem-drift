@@ -5,9 +5,9 @@ import { getMap, track01, track02, DEFAULT_MAP, PLAYABLE_MAPS } from '../src/map
 import type { Checkpoint } from '../src/maps/types.js';
 
 const gates: Checkpoint[] = [
-  { x: 0, y: 0, radius: 2 },
-  { x: 10, y: 0, radius: 2 },
-  { x: 10, y: 10, radius: 2 },
+  { x: 0, y: 0, radius: 2, angle: 0 },
+  { x: 10, y: 0, radius: 2, angle: 0 },
+  { x: 10, y: 10, radius: 2, angle: 0 },
 ];
 
 /** Drive the tracker through every gate in order once. */

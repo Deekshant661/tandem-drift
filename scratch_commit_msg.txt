@@ -1,0 +1,39 @@
+feat: recovery system, arcade handling tuning, further engine audio polish
+
+Recovery (press R): server-authoritative respawn at the last passed
+checkpoint (or spawn), facing the correct direction, at rest. New
+Checkpoint.angle field (derived from road tangent / gate chaining) makes
+respawn orientation correct on every map. A dedicated recovered message
+(separate from the 20Hz snapshot cadence) lets the client time a black
+fade-out/hold/fade-in transition precisely instead of guessing against
+latency; Predictor.hardReset and SnapshotBuffer.reset ensure no residual
+smoothing glides the car back from its pre-recovery position. A stuck-
+detection prompt (Press R to Recover) appears after ~4s of near-zero
+speed. A server-side out-of-bounds safety net auto-recovers the car if it
+ever ends up implausibly far from the playable world (a defensive check,
+not a normal occurrence -- the closed road walls already prevent it).
+Recovery is rate-limited server-side and ignored from spectators.
+
+Note on the auto-right after a flip ask: this sim is intentionally flat
+(Phase 2 design decision) -- there is no rollover physics for a car to
+flip out of, so implementing a fake visual flip-and-correct would not
+correspond to any real state. The stuck-detection prompt covers the same
+practical need (wedged against scenery) within this architecture.
+
+Driving feel: steering authority now ramps in earlier (full at 4 m/s) and
+gently tapers above 20 m/s for high-speed stability instead of staying
+razor-twitchy at any speed; snappier drive force, softer brake force,
+more controllable (less icy) handbrake drift. Keyboard input is now ramped
+(steer ~140ms, throttle ~200ms to full) instead of an instant on/off
+switch, which is most of what makes keyboard steering feel analog.
+
+Engine audio: added a master compressor across every sound as a clipping/
+harshness safety net, and further mellowed the high-speed band (lower
+filter cutoff, narrower pitch range) so top speed sounds throaty rather
+than harsh.
+
+102 tests (+16: recovery server logic incl. a real-websocket end-to-end
+flow, ramp math, checkpoint angle correctness via existing map tests,
+Predictor.hardReset, SnapshotBuffer.reset, GameClient recovery wiring).
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>

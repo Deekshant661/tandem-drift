@@ -9,6 +9,8 @@ export interface Checkpoint {
   x: number;
   y: number;
   radius: number;
+  /** Facing direction to recover with at this gate (see setVehicleState convention). */
+  angle: number;
 }
 
 export interface TrackMap {

@@ -20,18 +20,25 @@ export const VEHICLE_TUNING = {
   halfWidth: 0.9,
   halfLength: 2.0,
   density: 12,
-  /** Peak engine force, newtons. */
-  maxDriveForce: 4200,
-  /** Peak braking force, newtons. */
-  maxBrakeForce: 6000,
+  /** Peak engine force, newtons — snappier launch than a realistic car. */
+  maxDriveForce: 4600,
+  /** Peak braking force, newtons — firm but not an instant, jarring stop. */
+  maxBrakeForce: 5200,
   /** Max yaw rate at full steer, rad/s. */
-  maxTurnRate: 2.6,
-  /** Speed (m/s) at which full steering authority is reached. */
-  steerFullAuthoritySpeed: 6,
+  maxTurnRate: 2.9,
+  /** Speed (m/s) at which full steering authority is reached — low, so tight
+   *  parking-lot maneuvering feels natural rather than numb. */
+  steerFullAuthoritySpeed: 4,
+  /** Above this speed, steering authority gently tapers for high-speed
+   *  stability instead of staying razor-twitchy at any velocity. */
+  steerStabilitySpeed: 20,
+  /** Steering authority retained at very high speed (fraction of max). */
+  steerStabilityFloor: 0.72,
   /** Fraction of lateral velocity cancelled per tick with grip. */
-  gripNormal: 0.9,
-  /** Fraction cancelled per tick with handbrake pulled (drift). */
-  gripHandbrake: 0.12,
+  gripNormal: 0.88,
+  /** Fraction cancelled per tick with handbrake pulled — slidey but still
+   *  controllable, not frictionless ice. */
+  gripHandbrake: 0.18,
   linearDamping: 0.35,
   angularDamping: 3.0,
 } as const;
@@ -99,9 +106,15 @@ export function stepSim(sim: SimWorld, input: ControlInput, dt: number): void {
     body.applyForceToCenter(forward.clone().mul(dir * input.brake * t.maxBrakeForce), true);
   }
 
-  // 4. Steering: authority scales with speed so the car can't spin in place,
-  //    and reverses with reverse travel like real steering geometry.
-  const speedFactor = Math.min(1, Math.abs(forwardSpeed) / t.steerFullAuthoritySpeed);
+  // 4. Steering: authority ramps up with speed so the car can't spin in
+  //    place, then gently tapers back down above steerStabilitySpeed so
+  //    high-speed cornering stays composed instead of twitchy; reverses
+  //    with reverse travel like real steering geometry.
+  const absSpeed = Math.abs(forwardSpeed);
+  const rampUp = Math.min(1, absSpeed / t.steerFullAuthoritySpeed);
+  const overSpeed = Math.max(0, absSpeed - t.steerStabilitySpeed);
+  const taper = 1 - (1 - t.steerStabilityFloor) * Math.min(1, overSpeed / t.steerStabilitySpeed);
+  const speedFactor = rampUp * taper;
   const direction = forwardSpeed >= 0 ? 1 : -1;
   const targetYaw = input.steer * t.maxTurnRate * speedFactor * direction;
   body.setAngularVelocity(targetYaw + (body.getAngularVelocity() - targetYaw) * 0.5);

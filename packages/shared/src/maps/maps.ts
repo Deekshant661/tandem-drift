@@ -1,5 +1,5 @@
 import { ARENA_HEIGHT, ARENA_WIDTH } from '../constants.js';
-import type { TrackMap, WallSegment } from './types.js';
+import type { Checkpoint, TrackMap, WallSegment } from './types.js';
 import type { WorldMap } from '../world/types.js';
 import { worldToTrackMap } from '../world/generate.js';
 import { willowbrook } from '../world/willowbrook.js';
@@ -9,6 +9,20 @@ function ring(points: Array<[number, number]>): WallSegment[] {
   return points.map(([x1, y1], i) => {
     const [x2, y2] = points[(i + 1) % points.length]!;
     return { x1, y1, x2, y2 };
+  });
+}
+
+/**
+ * Derive each gate's recovery-facing angle from the direction to the next
+ * gate in the loop — same atan2(-dx, dy) convention as worldToTrackMap.
+ */
+function chainCheckpoints(gates: Array<{ x: number; y: number; radius: number }>): Checkpoint[] {
+  return gates.map((g, i) => {
+    const next = gates[(i + 1) % gates.length]!;
+    const dx = next.x - g.x;
+    const dy = next.y - g.y;
+    const len = Math.hypot(dx, dy) || 1;
+    return { ...g, angle: Math.atan2(-dx / len, dy / len) };
   });
 }
 
@@ -43,7 +57,7 @@ export function track02(): TrackMap {
     name: 'track02',
     spawn: { x: midX, y: -12, angle: 0 },
     walls: [...ring(chamferedRect(outerHw, outerHh, 10)), ...ring(chamferedRect(innerHw, innerHh, 6))],
-    checkpoints: [
+    checkpoints: chainCheckpoints([
       { x: midX, y: 0, radius: gateRadius },
       { x: midX - 5, y: midY - 4, radius: gateRadius },
       { x: 0, y: midY, radius: gateRadius },
@@ -52,7 +66,7 @@ export function track02(): TrackMap {
       { x: -midX + 5, y: -midY + 4, radius: gateRadius },
       { x: 0, y: -midY, radius: gateRadius },
       { x: midX - 5, y: -midY + 4, radius: gateRadius },
-    ],
+    ]),
   };
 }
 
@@ -110,7 +124,7 @@ export function track01(): TrackMap {
     // Start on the right straight, facing "up" the corridor (counter-clockwise).
     spawn: { x: midX, y: -12, angle: 0 },
     walls: [...ring(chamferedRect(outerHw, outerHh, 14)), ...ring(chamferedRect(innerHw, innerHh, 8))],
-    checkpoints: [
+    checkpoints: chainCheckpoints([
       { x: midX, y: 0, radius: gateRadius }, // start/finish, right straight
       { x: midX - 8, y: midY - 5, radius: gateRadius }, // top-right corner
       { x: 0, y: midY, radius: gateRadius }, // top straight
@@ -119,6 +133,6 @@ export function track01(): TrackMap {
       { x: -midX + 8, y: -midY + 5, radius: gateRadius }, // bottom-left corner
       { x: 0, y: -midY, radius: gateRadius }, // bottom straight
       { x: midX - 8, y: -midY + 5, radius: gateRadius }, // bottom-right corner
-    ],
+    ]),
   };
 }

@@ -63,7 +63,12 @@ export interface SwapSeatsMsg {
   type: 'swapSeats';
 }
 
-export type ClientMsg = JoinMsg | InputMsg | PingMsg | SwapSeatsMsg;
+/** Request to respawn the vehicle at the last passed checkpoint (or spawn). */
+export interface RecoverMsg {
+  type: 'recover';
+}
+
+export type ClientMsg = JoinMsg | InputMsg | PingMsg | SwapSeatsMsg | RecoverMsg;
 
 // ---- server -> client ----
 
@@ -120,13 +125,25 @@ export interface PongMsg {
   t: number;
 }
 
+/**
+ * Sent the instant a recovery (manual or automatic) is applied — separate
+ * from the regular 20 Hz snapshot cadence so the client can time its fade
+ * transition precisely instead of guessing against network latency.
+ */
+export interface RecoveredMsg {
+  type: 'recovered';
+  vehicle: VehicleSnapshot;
+  reason: 'manual' | 'out_of_bounds';
+}
+
 export type ServerMsg =
   | JoinedMsg
   | JoinErrorMsg
   | RoomStateMsg
   | SnapshotMsg
   | PongMsg
-  | SeatSwappedMsg;
+  | SeatSwappedMsg
+  | RecoveredMsg;
 
 // ---- codec ----
 
@@ -134,7 +151,7 @@ export function encode(msg: ClientMsg | ServerMsg): string {
   return JSON.stringify(msg);
 }
 
-const CLIENT_TYPES = new Set(['join', 'input', 'ping', 'swapSeats']);
+const CLIENT_TYPES = new Set(['join', 'input', 'ping', 'swapSeats', 'recover']);
 const SERVER_TYPES = new Set([
   'joined',
   'joinError',
@@ -142,6 +159,7 @@ const SERVER_TYPES = new Set([
   'snapshot',
   'pong',
   'seatSwapped',
+  'recovered',
 ]);
 
 function parse(data: string, allowed: Set<string>): unknown | null {

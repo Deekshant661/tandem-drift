@@ -101,6 +101,9 @@ export function createGameServer(): GameServer {
         case 'swapSeats':
           state.room?.requestSeatSwap(state.playerId);
           break;
+        case 'recover':
+          state.room?.requestRecover(state.playerId);
+          break;
       }
     });
 

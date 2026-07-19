@@ -8,6 +8,8 @@ import { Hud } from './Hud.js';
 import { Minimap } from './Minimap.js';
 import { PauseMenu } from './PauseMenu.js';
 import { PerfOverlay } from './PerfOverlay.js';
+import { RecoveryOverlay } from './RecoveryOverlay.js';
+import { StuckPrompt } from './StuckPrompt.js';
 
 // Memoized so the entire 3D scene only re-renders when `client` or `world`
 // actually change (rarely) — not on every ~20Hz GameClient state tick, which
@@ -50,6 +52,12 @@ export function App(): JSX.Element {
       )}
       <Hud client={client} />
       <PerfOverlay />
+      {state.phase === 'playing' && state.role && state.role !== 'spectator' && (
+        <>
+          <RecoveryOverlay client={client} />
+          <StuckPrompt client={client} />
+        </>
+      )}
       {paused && state.phase === 'playing' && (
         <PauseMenu client={client} onResume={() => setPaused(false)} />
       )}

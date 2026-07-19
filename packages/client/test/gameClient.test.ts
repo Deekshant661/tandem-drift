@@ -108,4 +108,53 @@ describe('GameClient state machine', () => {
     expect(gc.getState().swapPending).toBe(false);
     gc.dispose();
   });
+
+  it('sends a recover request only when seated and playing', () => {
+    const { conn, handlers } = fakeConnFactory();
+    const gc = new GameClient({ createConnection: () => conn as never });
+    gc.recover(); // lobby phase — ignored
+    expect(conn.sent.some((m: any) => m.type === 'recover')).toBe(false);
+
+    gc.join({ name: 'P', map: 'willowbrook' });
+    handlers.open!();
+    handlers.msg!({
+      type: 'joined',
+      roomCode: 'ABCDEF',
+      playerId: 'p',
+      role: 'pilot',
+      tick: 0,
+      token: 't',
+      map: 'willowbrook',
+    });
+    gc.recover();
+    expect(conn.sent.some((m: any) => m.type === 'recover')).toBe(true);
+    gc.dispose();
+  });
+
+  it('bumps recoveryRef and hard-resets pose on a recovered message', () => {
+    const { conn, handlers } = fakeConnFactory();
+    const gc = new GameClient({ createConnection: () => conn as never });
+    gc.join({ name: 'P', map: 'willowbrook' });
+    handlers.open!();
+    handlers.msg!({
+      type: 'joined',
+      roomCode: 'ABCDEF',
+      playerId: 'p',
+      role: 'pilot',
+      tick: 0,
+      token: 't',
+      map: 'willowbrook',
+    });
+    const versionBefore = gc.recoveryRef.version;
+    handlers.msg!({
+      type: 'recovered',
+      reason: 'manual',
+      vehicle: { x: 5, y: 6, angle: 0, vx: 0, vy: 0, angularVelocity: 0 },
+    });
+    expect(gc.recoveryRef.version).toBe(versionBefore + 1);
+    expect(gc.recoveryRef.reason).toBe('manual');
+    gc.samplePose(Date.now());
+    expect(gc.poseRef.current?.x).toBe(5);
+    gc.dispose();
+  });
 });

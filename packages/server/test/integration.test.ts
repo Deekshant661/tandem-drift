@@ -193,4 +193,39 @@ describe('server integration over real websockets', () => {
     client.send({ type: 'ping', t: 12345 });
     expect((await client.nextOfType('pong')).t).toBe(12345);
   });
+
+  it('recovers the car to a stop on request, over the real socket', async () => {
+    const port = start();
+    const pilot = new TestClient(port);
+    await pilot.open();
+    pilot.send({ type: 'join', name: 'Pilot', map: 'track01' });
+    const joined = await pilot.nextOfType('joined');
+
+    const engineer = new TestClient(port);
+    await engineer.open();
+    engineer.send({ type: 'join', name: 'Eng', roomCode: joined.roomCode });
+    await engineer.nextOfType('joined');
+
+    // Drive forward for real speed, then recover — the car must stop and
+    // teleport back near spawn, not just keep going.
+    engineer.send({
+      type: 'input',
+      seq: 1,
+      input: { steer: 0, throttle: 1, brake: 0, handbrake: false },
+    });
+    let moving = false;
+    for (let i = 0; i < 40 && !moving; i++) {
+      const snap = await engineer.nextOfType('snapshot');
+      moving = Math.hypot(snap.vehicle.vx, snap.vehicle.vy) > 5;
+    }
+    expect(moving).toBe(true);
+
+    pilot.send({ type: 'recover' });
+    const recovered = await pilot.nextOfType('recovered');
+    expect(recovered.reason).toBe('manual');
+    expect(recovered.vehicle.vx).toBe(0);
+    expect(recovered.vehicle.vy).toBe(0);
+    // Both seated players see the recovery, not just the requester.
+    expect((await engineer.nextOfType('recovered')).vehicle.vx).toBe(0);
+  });
 });

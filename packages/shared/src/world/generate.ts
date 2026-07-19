@@ -32,7 +32,10 @@ export function gatesFromSamples(samples: RoadSample[], count: number): Checkpoi
   const gates: Checkpoint[] = [];
   for (let g = 0; g < count; g++) {
     const s = samples[Math.floor((g / count) * samples.length)]!;
-    gates.push({ x: s.x, y: s.y, radius: s.width * 1.5 });
+    // Vehicle forward is local +y; rotated by angle a it is (-sin a, cos a).
+    // Matching that to the road tangent (tx, ty) gives a = atan2(-tx, ty) —
+    // the same convention worldToTrackMap uses for the spawn angle.
+    gates.push({ x: s.x, y: s.y, radius: s.width * 1.5, angle: Math.atan2(-s.tx, s.ty) });
   }
   return gates;
 }

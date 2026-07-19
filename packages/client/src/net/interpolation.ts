@@ -36,6 +36,14 @@ export class SnapshotBuffer {
     this.delayMs = delayMs;
   }
 
+  /** Discard buffered history — used after a teleport (recovery) so the
+   *  interpolator doesn't glide in from the pre-recovery position. */
+  reset(): void {
+    this.buffer.length = 0;
+    this.gaps.length = 0;
+    this.lastArrival = null;
+  }
+
   /**
    * Enable adaptive delay: the interpolation delay tracks measured snapshot
    * inter-arrival jitter (mean gap + 2.5 sigma, clamped to [60, 300] ms), so
