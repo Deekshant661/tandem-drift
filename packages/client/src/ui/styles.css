@@ -103,6 +103,16 @@ body {
   margin: 0;
 }
 
+#minimap {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  background: rgba(8, 10, 16, 0.55);
+  border-radius: 10px;
+  z-index: 5;
+  pointer-events: none;
+}
+
 .notice {
   position: fixed;
   bottom: 18px;

@@ -1,5 +1,7 @@
 import { Canvas } from '@react-three/fiber';
+import { Bloom, EffectComposer } from '@react-three/postprocessing';
 import type { WorldMap } from '@tandem/shared';
+import { Environment } from './environment/Environment.js';
 import type { GameClient } from '../game/client.js';
 import { SkyDome } from './SkyDome.js';
 import { Ground } from './Ground.js';
@@ -42,7 +44,12 @@ export function GameCanvas({
       <RoadMesh world={world} />
       <Gates client={client} world={world} />
       <Vehicle client={client} spec={compact01} />
+      <Environment world={world} />
       <ChaseCamera client={client} />
+      {/* Subtle bloom: sun-lit emissives (headlights, lamps, gate ring) glow. */}
+      <EffectComposer>
+        <Bloom intensity={0.35} luminanceThreshold={0.85} luminanceSmoothing={0.2} mipmapBlur />
+      </EffectComposer>
     </Canvas>
   );
 }
