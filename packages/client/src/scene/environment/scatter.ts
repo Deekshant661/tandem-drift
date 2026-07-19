@@ -3,6 +3,7 @@ import { mulberry32, sampleRoad, type WorldMap, type Zone } from '@tandem/shared
 export type PropKind =
   | 'pine'
   | 'oak'
+  | 'bush'
   | 'flower'
   | 'grass'
   | 'rock'
@@ -34,37 +35,56 @@ const ZONE_RECIPES: Record<Zone['kind'], Array<[PropKind, number]>> = {
     ['bench', 4],
     ['mailbox', 4],
     ['crate', 5],
+    ['bush', 10],
   ],
   forest: [
     ['pine', 46],
     ['oak', 22],
+    ['bush', 24],
     ['rock', 8],
-    ['grass', 30],
+    ['grass', 24],
   ],
   lake: [
     ['rock', 10],
     ['grass', 16],
     ['oak', 6],
+    ['bush', 8],
   ],
   field: [
     ['flower', 70],
-    ['grass', 50],
+    ['grass', 44],
     ['hay', 7],
     ['fence', 10],
+    ['bush', 6],
   ],
   tunnel: [['rock', 12]],
   viewpoint: [
     ['rock', 6],
     ['bench', 2],
     ['flower', 12],
+    ['bush', 5],
   ],
   parking: [['cone', 6]],
 };
+
+/**
+ * Kinds that read better as loose clumps than as an even sprinkle: forest
+ * trees/shrubs cluster into groves with grassy gaps between them, and field
+ * flowers cluster into patches rather than a uniform meadow dusting.
+ */
+const CLUSTERED: ReadonlySet<string> = new Set([
+  'forest:pine',
+  'forest:oak',
+  'forest:bush',
+  'field:flower',
+  'lake:bush',
+]);
 
 /** Extra wilderness sprinkled everywhere outside zones. */
 const WILD: Array<[PropKind, number]> = [
   ['pine', 60],
   ['oak', 40],
+  ['bush', 20],
   ['flower', 80],
   ['grass', 90],
   ['rock', 20],
@@ -114,9 +134,33 @@ export function scatterWorld(world: WorldMap): Placement[] {
     }
   };
 
+  /** Groves/patches: pick cluster centers within the zone, then scatter
+   *  tightly around each so vegetation reads as intentional clumps. */
+  const scatterClustered = (
+    kind: PropKind,
+    count: number,
+    zone: Zone,
+    clusterCount: number,
+    clusterRadiusFactor: number,
+  ): void => {
+    const centers = Array.from({ length: clusterCount }, () => {
+      const a = rng() * Math.PI * 2;
+      const d = Math.sqrt(rng()) * zone.radius * 0.65;
+      return { x: zone.x + Math.cos(a) * d, y: zone.y + Math.sin(a) * d };
+    });
+    for (let i = 0; i < count; i++) {
+      const c = centers[i % centers.length]!;
+      tryPlace(kind, c.x, c.y, zone.radius * clusterRadiusFactor, zone.kind);
+    }
+  };
+
   for (const zone of world.zones) {
     for (const [kind, count] of ZONE_RECIPES[zone.kind]) {
-      for (let i = 0; i < count; i++) tryPlace(kind, zone.x, zone.y, zone.radius, zone.kind);
+      if (CLUSTERED.has(`${zone.kind}:${kind}`)) {
+        scatterClustered(kind, count, zone, 6, 0.28);
+      } else {
+        for (let i = 0; i < count; i++) tryPlace(kind, zone.x, zone.y, zone.radius, zone.kind);
+      }
     }
   }
   for (const [kind, count] of WILD) {

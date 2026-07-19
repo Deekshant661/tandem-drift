@@ -1,13 +1,26 @@
+import { bandWeight, ENGINE_BANDS } from './engineCurve.js';
+
 /**
  * All game audio, synthesized with Web Audio — no asset downloads. Browsers
  * block audio until a user gesture, so start() is called lazily on first
  * keydown. Each sound is a small synth patch; replacing any of them with
  * recorded assets later only touches this module.
  */
+
+interface EngineBand {
+  osc: OscillatorNode;
+  filter: BiquadFilterNode;
+  gain: GainNode;
+  baseFreq: number;
+  freqRange: number;
+  center: number;
+  width: number;
+  peakGain: number;
+}
+
 export class AudioManager {
   private ctx: AudioContext | null = null;
-  private engineOsc: OscillatorNode | null = null;
-  private engineGain: GainNode | null = null;
+  private bands: EngineBand[] = [];
   private skidGain: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
 
@@ -16,14 +29,15 @@ export class AudioManager {
     const ctx = new AudioContext();
     this.ctx = ctx;
 
-    // Engine hum: sawtooth, pitch/volume track speed.
-    this.engineOsc = ctx.createOscillator();
-    this.engineGain = ctx.createGain();
-    this.engineOsc.type = 'sawtooth';
-    this.engineOsc.frequency.value = 60;
-    this.engineGain.gain.value = 0;
-    this.engineOsc.connect(this.engineGain).connect(ctx.destination);
-    this.engineOsc.start();
+    // Three overlapping engine "gears" — idle, low, high — each a filtered
+    // sawtooth with its own narrow pitch range, crossfaded by speed. This
+    // avoids one oscillator sweeping continuously upward, which is what
+    // made the old engine sound shriller and buzzier at speed.
+    this.bands = [
+      this.makeBand(ctx, { baseFreq: 55, freqRange: 10, ...ENGINE_BANDS.idle, peakGain: 0.07, filterHz: 500 }),
+      this.makeBand(ctx, { baseFreq: 95, freqRange: 35, ...ENGINE_BANDS.low, peakGain: 0.06, filterHz: 750 }),
+      this.makeBand(ctx, { baseFreq: 150, freqRange: 45, ...ENGINE_BANDS.high, peakGain: 0.05, filterHz: 1100 }),
+    ];
 
     // Shared noise buffer for skid/collision.
     const len = ctx.sampleRate;
@@ -32,7 +46,7 @@ export class AudioManager {
     for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
     this.noiseBuffer = buf;
 
-    // Continuous skid loop: band-passed noise, gated by skid().
+    // Continuous skid loop: band-passed noise, gated by update().
     const skidSrc = ctx.createBufferSource();
     skidSrc.buffer = buf;
     skidSrc.loop = true;
@@ -46,13 +60,57 @@ export class AudioManager {
     skidSrc.start();
   }
 
-  /** Per-tick update: engine follows speed; skid follows drift state. */
+  private makeBand(
+    ctx: AudioContext,
+    opts: {
+      baseFreq: number;
+      freqRange: number;
+      center: number;
+      width: number;
+      peakGain: number;
+      filterHz: number;
+    },
+  ): EngineBand {
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.value = opts.baseFreq;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    // A gentle lowpass tames the sawtooth's upper harmonics so the engine
+    // stays warm and rounded rather than harsh, even in the "high" band.
+    filter.frequency.value = opts.filterHz;
+    filter.Q.value = 0.4;
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    osc.connect(filter).connect(gain).connect(ctx.destination);
+    osc.start();
+    return {
+      osc,
+      filter,
+      gain,
+      baseFreq: opts.baseFreq,
+      freqRange: opts.freqRange,
+      center: opts.center,
+      width: opts.width,
+      peakGain: opts.peakGain,
+    };
+  }
+
+  /** Per-tick update: three engine bands crossfade by speed with limited,
+   *  independent pitch ranges; the skid loop gates on drift state. */
   update(speedMs: number, skidding: boolean): void {
-    if (!this.ctx || !this.engineOsc || !this.engineGain || !this.skidGain) return;
+    if (!this.ctx || this.bands.length === 0 || !this.skidGain) return;
     const t = this.ctx.currentTime;
     const norm = Math.min(1, speedMs / 30);
-    this.engineOsc.frequency.setTargetAtTime(60 + norm * 180, t, 0.1);
-    this.engineGain.gain.setTargetAtTime(norm * 0.08, t, 0.1);
+    const smoothing = 0.12;
+
+    for (const band of this.bands) {
+      const weight = bandWeight(norm, band.center, band.width);
+      band.gain.gain.setTargetAtTime(band.peakGain * weight, t, smoothing);
+      const freq = band.baseFreq + norm * band.freqRange;
+      band.osc.frequency.setTargetAtTime(freq, t, smoothing);
+    }
+
     this.skidGain.gain.setTargetAtTime(skidding && speedMs > 4 ? 0.12 : 0, t, 0.05);
   }
 
