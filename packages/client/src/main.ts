@@ -81,6 +81,16 @@ function renderHud(opts: {
 }
 
 async function main(): Promise<void> {
+  // A production page can't reach a localhost server: the deployment forgot
+  // to set VITE_SERVER_URL (SERVER_URL repository variable). Fail loudly.
+  if (location.protocol === 'https:' && SERVER_URL.includes('localhost')) {
+    renderHud({
+      status:
+        'No game server configured for this deployment (SERVER_URL is unset). See the README.',
+    });
+    return;
+  }
+
   const choice = await runLobby();
   renderHud({ status: 'Connecting…' });
 
