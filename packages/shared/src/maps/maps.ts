@@ -23,6 +23,49 @@ function chamferedRect(hw: number, hh: number, chamfer: number): Array<[number, 
   ];
 }
 
+/**
+ * Track 02 "The Squeeze": same circuit shape as track01 but with a much
+ * narrower corridor (~13 m) and sharper chamfers — a communication stress test.
+ */
+export function track02(): TrackMap {
+  const outerHw = ARENA_WIDTH / 2;
+  const outerHh = ARENA_HEIGHT / 2;
+  const innerHw = 46;
+  const innerHh = 26;
+  const midX = (outerHw + innerHw) / 2; // 53
+  const midY = (outerHh + innerHh) / 2; // 33
+  const gateRadius = 7;
+
+  return {
+    name: 'track02',
+    spawn: { x: midX, y: -12, angle: 0 },
+    walls: [...ring(chamferedRect(outerHw, outerHh, 10)), ...ring(chamferedRect(innerHw, innerHh, 6))],
+    checkpoints: [
+      { x: midX, y: 0, radius: gateRadius },
+      { x: midX - 5, y: midY - 4, radius: gateRadius },
+      { x: 0, y: midY, radius: gateRadius },
+      { x: -midX + 5, y: midY - 4, radius: gateRadius },
+      { x: -midX, y: 0, radius: gateRadius },
+      { x: -midX + 5, y: -midY + 4, radius: gateRadius },
+      { x: 0, y: -midY, radius: gateRadius },
+      { x: midX - 5, y: -midY + 4, radius: gateRadius },
+    ],
+  };
+}
+
+/** Playable maps by name; arena is test-only and deliberately not listed. */
+export const PLAYABLE_MAPS: Record<string, () => TrackMap> = {
+  track01,
+  track02,
+};
+
+export const DEFAULT_MAP = 'track01';
+
+/** Resolve a playable map by name, falling back to the default. */
+export function getMap(name: string | undefined): TrackMap {
+  return (PLAYABLE_MAPS[name ?? DEFAULT_MAP] ?? track01)();
+}
+
 /** Plain walled rectangle, no checkpoints. Used for tests and free drive. */
 export function arenaMap(): TrackMap {
   return {

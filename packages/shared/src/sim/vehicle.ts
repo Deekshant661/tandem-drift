@@ -109,6 +109,15 @@ export function stepSim(sim: SimWorld, input: ControlInput, dt: number): void {
   sim.world.step(dt);
 }
 
+/** Overwrite the vehicle's kinematic state — used for client-side reconciliation. */
+export function setVehicleState(sim: SimWorld, v: VehicleSnapshot): void {
+  const b = sim.vehicle;
+  b.setPosition(new Vec2(v.x, v.y));
+  b.setAngle(v.angle);
+  b.setLinearVelocity(new Vec2(v.vx, v.vy));
+  b.setAngularVelocity(v.angularVelocity);
+}
+
 export function snapshotVehicle(sim: SimWorld): VehicleSnapshot {
   const b = sim.vehicle;
   const p = b.getPosition();

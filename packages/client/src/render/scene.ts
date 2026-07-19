@@ -1,11 +1,5 @@
 import { Application, Container, Graphics } from 'pixi.js';
-import {
-  ARENA_HEIGHT,
-  ARENA_WIDTH,
-  track01,
-  type TrackMap,
-  type VehicleSnapshot,
-} from '@tandem/shared';
+import { ARENA_HEIGHT, ARENA_WIDTH, type TrackMap, type VehicleSnapshot } from '@tandem/shared';
 
 /** Pixels per simulation meter. */
 const SCALE = 10;
@@ -19,11 +13,12 @@ export class Scene {
   readonly app = new Application();
   private readonly world = new Container();
   private readonly car = new Container();
-  private readonly map: TrackMap = track01();
+  private map: TrackMap | null = null;
   private readonly gates: Graphics[] = [];
   private activeGate = -1;
 
-  async init(): Promise<void> {
+  async init(map: TrackMap): Promise<void> {
+    this.map = map;
     await this.app.init({
       resizeTo: window,
       background: 0x10141c,
@@ -49,14 +44,14 @@ export class Scene {
 
     // Track walls, exactly as the server simulates them.
     const walls = new Graphics();
-    for (const seg of this.map.walls) {
+    for (const seg of map.walls) {
       walls.moveTo(seg.x1, seg.y1).lineTo(seg.x2, seg.y2);
     }
     walls.stroke({ width: 0.6, color: 0x3b4a63 });
     this.world.addChild(walls);
 
     // Checkpoint gates; index 0 (start/finish) drawn distinctly.
-    this.map.checkpoints.forEach((cp, i) => {
+    map.checkpoints.forEach((cp, i) => {
       const gate = new Graphics()
         .circle(cp.x, cp.y, cp.radius)
         .stroke({ width: 0.3, color: i === 0 ? 0xfbbf24 : 0x334761, alpha: 0.9 });
@@ -73,12 +68,13 @@ export class Scene {
     this.world.addChild(this.car);
   }
 
-  /** Highlight the gate the crew must reach next. */
+  /** Highlight the gate the crew must reach next. No-op until init completes. */
   setActiveGate(index: number): void {
-    if (index === this.activeGate) return;
+    if (!this.map || this.gates.length === 0 || index === this.activeGate) return;
     this.activeGate = index;
+    const checkpoints = this.map.checkpoints;
     this.gates.forEach((gate, i) => {
-      const cp = this.map.checkpoints[i]!;
+      const cp = checkpoints[i]!;
       gate
         .clear()
         .circle(cp.x, cp.y, cp.radius)

@@ -27,6 +27,7 @@ describe('protocol codec', () => {
         pilot: { steer: 1, throttle: 0, brake: 0, handbrake: false },
         engineer: { steer: 0, throttle: 0.8, brake: 0, handbrake: false },
       },
+      ack: { pilot: 41, engineer: -1 },
       race: { lap: 2, nextCheckpoint: 3, currentLapMs: 12500, lastLapMs: 61000, bestLapMs: null },
     };
     expect(decodeServerMsg(encode(msg))).toEqual(msg);

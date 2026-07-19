@@ -87,9 +87,10 @@ describe('server integration over real websockets', () => {
 
     const pilot = new TestClient(port);
     await pilot.open();
-    pilot.send({ type: 'join', name: 'Pilot' });
+    pilot.send({ type: 'join', name: 'Pilot', map: 'track02' });
     const joined = await pilot.nextOfType('joined');
     expect(joined.role).toBe('pilot');
+    expect(joined.map).toBe('track02');
     expect(joined.roomCode).toMatch(/^[A-Z2-9]{6}$/);
 
     const engineer = new TestClient(port);
@@ -120,6 +121,7 @@ describe('server integration over real websockets', () => {
     }
     expect(moved).toBe(true);
     expect(last!.inputs.engineer.throttle).toBe(1);
+    expect(last!.ack.engineer).toBe(1); // the applied input seq is acknowledged
 
     const pilotSnap = await pilot.nextOfType('snapshot');
     expect(pilotSnap.vehicle).toBeDefined();

@@ -43,6 +43,8 @@ export interface JoinMsg {
   name: string;
   /** Reconnection token from a previous `joined` message; reclaims the old seat. */
   token?: string;
+  /** Map to play, honored only when creating a new room. */
+  map?: string;
 }
 
 export interface InputMsg {
@@ -73,6 +75,8 @@ export interface JoinedMsg {
   tick: number;
   /** Present this token on a future join to reclaim the seat after a disconnect. */
   token: string;
+  /** Name of the map this room plays. */
+  map: string;
 }
 
 export interface JoinErrorMsg {
@@ -99,6 +103,8 @@ export interface SnapshotMsg {
   vehicle: VehicleSnapshot;
   /** Last applied inputs, so each client can show the partner's controls. */
   inputs: { pilot: ControlInput; engineer: ControlInput };
+  /** Highest input seq applied per seat — lets clients discard acked inputs during prediction. */
+  ack: { pilot: number; engineer: number };
   race: RaceInfo;
 }
 
@@ -173,6 +179,7 @@ export function decodeClientMsg(data: string): ClientMsg | null {
     if (typeof obj.name !== 'string') return null;
     if (obj.token !== undefined && typeof obj.token !== 'string') return null;
     if (obj.roomCode !== undefined && typeof obj.roomCode !== 'string') return null;
+    if (obj.map !== undefined && typeof obj.map !== 'string') return null;
   }
   if (obj.type === 'ping' && typeof obj.t !== 'number') return null;
   return obj;

@@ -53,7 +53,7 @@ export function createGameServer(): GameServer {
           if (state.room) return; // already seated
           let room: GameRoom | undefined;
           if (msg.roomCode === undefined) {
-            room = rooms.createRoom();
+            room = rooms.createRoom(msg.map);
           } else {
             room = rooms.getRoom(msg.roomCode);
             if (!room) {
@@ -86,6 +86,7 @@ export function createGameServer(): GameServer {
               role: player.role,
               tick: room.currentTick,
               token: player.token,
+              map: room.mapName,
             }),
           );
           room.broadcastRoomState();

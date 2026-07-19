@@ -6,7 +6,7 @@ import {
   encode,
   NEUTRAL_INPUT,
   RaceTracker,
-  track01,
+  getMap,
   sanitizeInput,
   SIM_DT,
   SIM_HZ,
@@ -50,9 +50,9 @@ export const MAX_SPECTATORS = 8;
  */
 export class GameRoom {
   readonly code: string;
-  private readonly map = track01();
-  private readonly sim: SimWorld = createSimWorld(this.map);
-  private readonly race = new RaceTracker(this.map.checkpoints);
+  private readonly map;
+  private readonly sim: SimWorld;
+  private readonly race: RaceTracker;
   private readonly swapRequests = new Set<string>();
   private readonly players = new Map<string, RoomPlayer>();
   private readonly pending = new Map<string, PendingReconnect>();
@@ -65,9 +65,16 @@ export class GameRoom {
   private nextTickAt = 0;
   private readonly onEmpty: (room: GameRoom) => void;
 
-  constructor(code: string, onEmpty: (room: GameRoom) => void) {
+  constructor(code: string, onEmpty: (room: GameRoom) => void, mapName?: string) {
     this.code = code;
     this.onEmpty = onEmpty;
+    this.map = getMap(mapName);
+    this.sim = createSimWorld(this.map);
+    this.race = new RaceTracker(this.map.checkpoints);
+  }
+
+  get mapName(): string {
+    return this.map.name;
   }
 
   get playerCount(): number {
@@ -250,11 +257,14 @@ export class GameRoom {
     const vehicle = snapshotVehicle(this.sim);
     this.race.update(vehicle.x, vehicle.y, this.tick);
     if (this.tick % SNAPSHOT_EVERY_TICKS === 0) {
+      const ack = { pilot: -1, engineer: -1 };
+      for (const p of this.seatedPlayers()) ack[p.role as Seat] = p.lastInputSeq;
       this.broadcast({
         type: 'snapshot',
         tick: this.tick,
         vehicle,
         inputs: { pilot: this.inputs.pilot, engineer: this.inputs.engineer },
+        ack,
         race: this.race.state(this.tick),
       });
     }

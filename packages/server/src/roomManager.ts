@@ -18,12 +18,12 @@ export class RoomManager {
     return n;
   }
 
-  createRoom(): GameRoom {
+  createRoom(mapName?: string): GameRoom {
     let code: string;
     do {
       code = this.generateCode();
     } while (this.rooms.has(code));
-    const room = new GameRoom(code, (r) => this.rooms.delete(r.code));
+    const room = new GameRoom(code, (r) => this.rooms.delete(r.code), mapName);
     this.rooms.set(code, room);
     return room;
   }

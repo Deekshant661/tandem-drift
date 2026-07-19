@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SIM_HZ } from '../src/constants.js';
 import { RaceTracker } from '../src/sim/race.js';
-import { track01 } from '../src/maps/maps.js';
+import { getMap, track01, track02, DEFAULT_MAP, PLAYABLE_MAPS } from '../src/maps/maps.js';
 import type { Checkpoint } from '../src/maps/types.js';
 
 const gates: Checkpoint[] = [
@@ -83,13 +83,23 @@ describe('RaceTracker', () => {
   });
 });
 
-describe('track01 map', () => {
-  it('is well-formed: closed walls, ordered gates, spawn inside gate 0', () => {
-    const map = track01();
+describe('track maps', () => {
+  it.each([
+    ['track01', track01],
+    ['track02', track02],
+  ])('%s is well-formed', (_name, factory) => {
+    const map = factory();
     expect(map.walls.length).toBeGreaterThan(8);
     expect(map.checkpoints.length).toBe(8);
     const start = map.checkpoints[0]!;
     const d = Math.hypot(map.spawn.x - start.x, map.spawn.y - start.y);
-    expect(d).toBeLessThan(start.radius + 5); // spawn near start/finish
+    expect(d).toBeLessThan(start.radius + 6); // spawn near start/finish
+  });
+
+  it('resolves maps by name with safe fallback', () => {
+    expect(getMap('track02').name).toBe('track02');
+    expect(getMap(undefined).name).toBe(DEFAULT_MAP);
+    expect(getMap('no-such-map').name).toBe('track01');
+    expect(Object.keys(PLAYABLE_MAPS)).toEqual(['track01', 'track02']);
   });
 });

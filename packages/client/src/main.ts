@@ -1,4 +1,5 @@
 import {
+  getMap,
   INPUT_SEND_HZ,
   INTERPOLATION_DELAY_MS,
   type PlayerInfo,
@@ -7,9 +8,11 @@ import {
 } from '@tandem/shared';
 import { Connection } from './net/connection.js';
 import { SnapshotBuffer } from './net/interpolation.js';
+import { Predictor } from './net/prediction.js';
 import { KeyboardInput } from './input/keyboard.js';
 import { Scene } from './render/scene.js';
 import { EngineAudio } from './audio/engine.js';
+import { runLobby } from './ui/lobby.js';
 
 const SERVER_URL =
   (import.meta.env.VITE_SERVER_URL as string | undefined) ?? 'ws://localhost:8080';
@@ -45,6 +48,7 @@ function renderHud(opts: {
   swapPending?: boolean;
   status?: string;
 }): void {
+  hud.hidden = false;
   if (opts.status) {
     hud.textContent = opts.status;
     return;
@@ -77,11 +81,12 @@ function renderHud(opts: {
 }
 
 async function main(): Promise<void> {
-  const scene = new Scene();
-  await scene.init();
+  const choice = await runLobby();
+  renderHud({ status: 'Connecting…' });
 
   const url = new URL(location.href);
-  const name = url.searchParams.get('name') ?? `Player-${Math.floor(Math.random() * 1000)}`;
+  const scene = new Scene();
+  let sceneReady = false;
 
   const snapshots = new SnapshotBuffer(INTERPOLATION_DELAY_MS);
   snapshots.enableAdaptiveDelay();
@@ -89,8 +94,9 @@ async function main(): Promise<void> {
   const audio = new EngineAudio();
 
   let conn: Connection | null = null;
+  let predictor: Predictor | null = null;
   let role: Role | null = null;
-  let myRoom: string | undefined = url.searchParams.get('room')?.toUpperCase() ?? undefined;
+  let myRoom: string | undefined = choice.roomCode;
   let players: PlayerInfo[] = [];
   let race: RaceInfo | undefined;
   let speedKmh = 0;
@@ -122,33 +128,46 @@ async function main(): Promise<void> {
       const token = myRoom
         ? (sessionStorage.getItem(tokenKey(myRoom)) ?? undefined)
         : undefined;
-      c.send({ type: 'join', roomCode: myRoom, name, token });
+      c.send({ type: 'join', roomCode: myRoom, name: choice.name, token, map: choice.map });
     });
 
     c.onClose(() => {
       role = null;
+      predictor = null;
       if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
         renderHud({ status: 'Disconnected from server. Refresh to try again.' });
         return;
       }
       reconnectAttempts++;
-      renderHud({
-        status: `Connection lost — reconnecting (attempt ${reconnectAttempts})…`,
-      });
+      renderHud({ status: `Connection lost — reconnecting (attempt ${reconnectAttempts})…` });
       setTimeout(connect, RECONNECT_INTERVAL_MS);
     });
 
     c.onMessage((msg) => {
       switch (msg.type) {
-        case 'joined':
+        case 'joined': {
           role = msg.role;
           myRoom = msg.roomCode;
           reconnectAttempts = 0;
           sessionStorage.setItem(tokenKey(msg.roomCode), msg.token);
           url.searchParams.set('room', msg.roomCode);
           history.replaceState(null, '', url);
+          const map = getMap(msg.map);
+          if (!sceneReady) {
+            sceneReady = true;
+            // Seated players render their locally-predicted car (immediate
+            // control feedback); spectators render interpolated snapshots.
+            void scene.init(map).then(() => {
+              scene.app.ticker.add(() => {
+                const pose = predictor?.sample() ?? snapshots.sample(performance.now());
+                if (pose) scene.update(pose);
+              });
+            });
+          }
+          predictor = role !== 'spectator' ? new Predictor(map, role) : null;
           refreshHud();
           break;
+        }
         case 'joinError':
           renderHud({
             status:
@@ -164,10 +183,12 @@ async function main(): Promise<void> {
         case 'seatSwapped':
           role = msg.seat;
           swapPending = false;
+          predictor?.setSeat(msg.seat);
           refreshHud();
           break;
         case 'snapshot':
           snapshots.push(performance.now(), msg.vehicle);
+          predictor?.onSnapshot(msg);
           race = msg.race;
           speedKmh = Math.hypot(msg.vehicle.vx, msg.vehicle.vy) * 3.6;
           scene.setActiveGate(msg.race.nextCheckpoint);
@@ -191,10 +212,13 @@ async function main(): Promise<void> {
     }
   });
 
-  // Fixed-rate input sender, decoupled from the render loop.
+  // Fixed-rate input sender, decoupled from the render loop. Each packet is
+  // both transmitted and fed to the local predictor.
   setInterval(() => {
     if (!role || role === 'spectator') return;
-    conn?.send({ type: 'input', seq: ++inputSeq, input: keyboard.read(role) });
+    const input = keyboard.read(role);
+    conn?.send({ type: 'input', seq: ++inputSeq, input });
+    predictor?.addLocalInput(inputSeq, input);
   }, 1000 / INPUT_SEND_HZ);
 
   // HUD + engine audio refresh.
@@ -202,11 +226,6 @@ async function main(): Promise<void> {
     refreshHud();
     audio.update(speedKmh / 3.6);
   }, 250);
-
-  scene.app.ticker.add(() => {
-    const state = snapshots.sample(performance.now());
-    if (state) scene.update(state);
-  });
 }
 
 void main();
