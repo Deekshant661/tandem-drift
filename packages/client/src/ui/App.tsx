@@ -5,6 +5,7 @@ import { useGameClient } from '../game/store.js';
 import { GameCanvas } from '../scene/GameCanvas.js';
 import { Lobby } from './Lobby.js';
 import { Hud } from './Hud.js';
+import { Minimap } from './Minimap.js';
 
 export function App(): JSX.Element {
   const client = useMemo(() => new GameClient(), []);
@@ -15,7 +16,12 @@ export function App(): JSX.Element {
   return (
     <>
       {state.phase === 'lobby' && <Lobby client={client} />}
-      {state.phase === 'playing' && world && <GameCanvas client={client} world={world} />}
+      {state.phase === 'playing' && world && (
+        <>
+          <GameCanvas client={client} world={world} />
+          <Minimap client={client} world={world} />
+        </>
+      )}
       {state.phase === 'playing' && !world && (
         <div className="notice">
           This room plays a legacy 2D map — create a Willowbrook room to see the 3D world.
