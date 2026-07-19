@@ -1,0 +1,19 @@
+{
+  "name": "tandem-drift",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Cooperative multiplayer driving game: two players, one car.",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "dev:server": "npm run dev --workspace @tandem/server",
+    "dev:client": "npm run dev --workspace @tandem/client"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9"
+  }
+}

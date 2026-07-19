@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tandem Drift</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #10141c; color: #e8ecf2; font-family: system-ui, sans-serif; overflow: hidden; }
+      #hud { position: fixed; top: 12px; left: 12px; background: rgba(8, 10, 16, 0.75); padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.6; pointer-events: none; }
+      #hud .code { font-size: 20px; letter-spacing: 3px; font-weight: 700; color: #7dd3fc; }
+      #hud .seat-pilot { color: #fbbf24; font-weight: 600; }
+      #hud .seat-engineer { color: #34d399; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <div id="hud">Connecting…</div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
