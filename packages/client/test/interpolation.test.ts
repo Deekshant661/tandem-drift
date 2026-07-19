@@ -44,6 +44,16 @@ describe('SnapshotBuffer', () => {
     // Oldest retained snapshot is 999 - 63 = 936; render far in the past clamps to it.
     expect(buf.sample(0)?.x).toBe(936);
   });
+
+  it('reset() discards history so a teleport does not interpolate from stale positions', () => {
+    const buf = new SnapshotBuffer(100);
+    buf.push(1000, snap(500));
+    buf.push(1050, snap(510));
+    buf.reset();
+    expect(buf.sample(2000)).toBeNull();
+    buf.push(3000, snap(1));
+    expect(buf.sample(3000)?.x).toBe(1);
+  });
 });
 
 describe('adaptive delay', () => {

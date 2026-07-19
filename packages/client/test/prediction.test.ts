@@ -125,4 +125,24 @@ describe('Predictor', () => {
     const truth = snapshotVehicle(server.sim);
     expect(Math.hypot(pose.x - truth.x, pose.y - truth.y)).toBeLessThan(0.2);
   });
+
+  it('hardReset snaps immediately with no smoothing and drops pending inputs', () => {
+    const server = new MiniServer();
+    const predictor = new Predictor(arenaMap(), 'engineer');
+    const snap = server.step() ?? server.step() ?? server.step();
+    if (snap) predictor.onSnapshot(snap);
+
+    // Predict forward so there's a large gap between predicted and recovery pose.
+    for (let seq = 1; seq <= 10; seq++) predictor.addLocalInput(seq, THROTTLE);
+    const before = predictor.sample()!;
+    expect(Math.abs(before.y)).toBeGreaterThan(0.5);
+
+    predictor.hardReset({ x: 40, y: -40, angle: 1.2, vx: 0, vy: 0, angularVelocity: 0 });
+    // First sample right after a hard reset must already be at the new pose —
+    // no gliding, no residual pending-input replay.
+    const after = predictor.sample()!;
+    expect(after.x).toBeCloseTo(40, 1);
+    expect(after.y).toBeCloseTo(-40, 1);
+    expect(after.angle).toBeCloseTo(1.2, 5);
+  });
 });

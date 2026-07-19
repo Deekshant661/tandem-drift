@@ -1,4 +1,14 @@
-import { NEUTRAL_INPUT, type ControlInput, type Seat } from '@tandem/shared';
+import { INPUT_SEND_HZ, NEUTRAL_INPUT, type ControlInput, type Seat } from '@tandem/shared';
+import { ramp } from './ramp.js';
+
+/** How fast steer/throttle ramp toward the held key's target, in units/sec.
+ *  Turns the raw digital keyboard signal into something that feels analog
+ *  instead of an on/off switch — the single biggest lever for "responsive
+ *  but not twitchy" handling on keyboard. Braking stays instant: players
+ *  expect the brake to bite the moment they press it. */
+const STEER_RAMP_PER_SEC = 7;
+const THROTTLE_RAMP_PER_SEC = 5;
+const DT = 1 / INPUT_SEND_HZ;
 
 /**
  * Keyboard capture. Both seats use the same keys; the server only honors the
@@ -9,6 +19,8 @@ import { NEUTRAL_INPUT, type ControlInput, type Seat } from '@tandem/shared';
  */
 export class KeyboardInput {
   private readonly down = new Set<string>();
+  private steerValue = 0;
+  private throttleValue = 0;
 
   constructor() {
     window.addEventListener('keydown', (e) => {
@@ -27,10 +39,14 @@ export class KeyboardInput {
   read(seat: Seat): ControlInput {
     const input: ControlInput = { ...NEUTRAL_INPUT };
     if (seat === 'pilot') {
-      input.steer =
+      const targetSteer =
         (this.has('KeyD', 'ArrowRight') ? 1 : 0) - (this.has('KeyA', 'ArrowLeft') ? 1 : 0);
+      this.steerValue = ramp(this.steerValue, targetSteer, STEER_RAMP_PER_SEC, DT);
+      input.steer = this.steerValue;
     } else {
-      input.throttle = this.has('KeyW', 'ArrowUp') ? 1 : 0;
+      const targetThrottle = this.has('KeyW', 'ArrowUp') ? 1 : 0;
+      this.throttleValue = ramp(this.throttleValue, targetThrottle, THROTTLE_RAMP_PER_SEC, DT);
+      input.throttle = this.throttleValue;
       input.brake = this.has('KeyS', 'ArrowDown') ? 1 : 0;
       input.handbrake = this.has('Space');
     }

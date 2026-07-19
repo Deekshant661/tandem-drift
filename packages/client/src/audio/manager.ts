@@ -20,6 +20,7 @@ interface EngineBand {
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
+  private master: DynamicsCompressorNode | null = null;
   private bands: EngineBand[] = [];
   private skidGain: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
@@ -29,14 +30,28 @@ export class AudioManager {
     const ctx = new AudioContext();
     this.ctx = ctx;
 
+    // Every sound routes through one master compressor — a safety net so
+    // overlapping layers (engine bands + skid + collision + horn) can never
+    // sum into clipping or harshness, however they combine.
+    const master = ctx.createDynamicsCompressor();
+    master.threshold.value = -18;
+    master.knee.value = 12;
+    master.ratio.value = 4;
+    master.attack.value = 0.003;
+    master.release.value = 0.15;
+    master.connect(ctx.destination);
+    this.master = master;
+
     // Three overlapping engine "gears" — idle, low, high — each a filtered
     // sawtooth with its own narrow pitch range, crossfaded by speed. This
     // avoids one oscillator sweeping continuously upward, which is what
-    // made the old engine sound shriller and buzzier at speed.
+    // made the old engine sound shriller and buzzier at speed. The high
+    // band stays deliberately mellow (low filter cutoff, modest pitch range)
+    // so top speed sounds throaty and exciting rather than harsh.
     this.bands = [
-      this.makeBand(ctx, { baseFreq: 55, freqRange: 10, ...ENGINE_BANDS.idle, peakGain: 0.07, filterHz: 500 }),
-      this.makeBand(ctx, { baseFreq: 95, freqRange: 35, ...ENGINE_BANDS.low, peakGain: 0.06, filterHz: 750 }),
-      this.makeBand(ctx, { baseFreq: 150, freqRange: 45, ...ENGINE_BANDS.high, peakGain: 0.05, filterHz: 1100 }),
+      this.makeBand(ctx, { baseFreq: 55, freqRange: 10, ...ENGINE_BANDS.idle, peakGain: 0.07, filterHz: 480 }),
+      this.makeBand(ctx, { baseFreq: 95, freqRange: 32, ...ENGINE_BANDS.low, peakGain: 0.06, filterHz: 680 }),
+      this.makeBand(ctx, { baseFreq: 145, freqRange: 38, ...ENGINE_BANDS.high, peakGain: 0.05, filterHz: 880 }),
     ];
 
     // Shared noise buffer for skid/collision.
@@ -56,7 +71,7 @@ export class AudioManager {
     bp.Q.value = 0.8;
     this.skidGain = ctx.createGain();
     this.skidGain.gain.value = 0;
-    skidSrc.connect(bp).connect(this.skidGain).connect(ctx.destination);
+    skidSrc.connect(bp).connect(this.skidGain).connect(master);
     skidSrc.start();
   }
 
@@ -82,7 +97,7 @@ export class AudioManager {
     filter.Q.value = 0.4;
     const gain = ctx.createGain();
     gain.gain.value = 0;
-    osc.connect(filter).connect(gain).connect(ctx.destination);
+    osc.connect(filter).connect(gain).connect(this.master!);
     osc.start();
     return {
       osc,
@@ -126,7 +141,7 @@ export class AudioManager {
     const g = ctx.createGain();
     g.gain.setValueAtTime(Math.min(0.5, impulse * 0.5), ctx.currentTime);
     g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
-    src.connect(lp).connect(g).connect(ctx.destination);
+    src.connect(lp).connect(g).connect(this.master!);
     src.start();
     src.stop(ctx.currentTime + 0.3);
   }
@@ -142,7 +157,7 @@ export class AudioManager {
       const g = ctx.createGain();
       g.gain.setValueAtTime(0.08, ctx.currentTime);
       g.gain.setTargetAtTime(0, ctx.currentTime + 0.25, 0.03);
-      o.connect(g).connect(ctx.destination);
+      o.connect(g).connect(this.master!);
       o.start();
       o.stop(ctx.currentTime + 0.4);
     }
@@ -159,7 +174,7 @@ export class AudioManager {
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.05, ctx.currentTime);
     g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
-    o.connect(g).connect(ctx.destination);
+    o.connect(g).connect(this.master!);
     o.start();
     o.stop(ctx.currentTime + 0.1);
   }

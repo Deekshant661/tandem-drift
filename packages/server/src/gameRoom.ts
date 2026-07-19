@@ -8,6 +8,7 @@ import {
   RaceTracker,
   getMap,
   sanitizeInput,
+  setVehicleState,
   SIM_DT,
   SIM_HZ,
   SNAPSHOT_EVERY_TICKS,
@@ -20,6 +21,26 @@ import {
   type ServerMsg,
   type SimWorld,
 } from '@tandem/shared';
+
+/** A pose the vehicle can be recovered to: spawn, or the last passed gate. */
+interface RecoveryPose {
+  x: number;
+  y: number;
+  angle: number;
+}
+
+/** Minimum ticks between recoveries — stops spamming R from feeling broken. */
+export const RECOVERY_COOLDOWN_TICKS = SIM_HZ; // 1 second
+
+/** Defensive bound: no legitimate Willowbrook position is anywhere near this
+ *  far out. Catches theoretical physics-tunneling bugs ("fell off the map")
+ *  that the closed road walls should already prevent. */
+export const OUT_OF_BOUNDS_RADIUS = 3000;
+
+/** True if a position is implausibly far from the playable world. */
+export function isOutOfBounds(x: number, y: number, limit = OUT_OF_BOUNDS_RADIUS): boolean {
+  return Math.hypot(x, y) > limit;
+}
 
 export interface RoomPlayer {
   id: string;
@@ -64,6 +85,8 @@ export class GameRoom {
   private timer: NodeJS.Timeout | null = null;
   private nextTickAt = 0;
   private readonly onEmpty: (room: GameRoom) => void;
+  private recoveryPose: RecoveryPose;
+  private lastRecoveryTick = -Infinity;
 
   constructor(code: string, onEmpty: (room: GameRoom) => void, mapName?: string) {
     this.code = code;
@@ -71,6 +94,7 @@ export class GameRoom {
     this.map = getMap(mapName);
     this.sim = createSimWorld(this.map);
     this.race = new RaceTracker(this.map.checkpoints);
+    this.recoveryPose = { ...this.map.spawn };
   }
 
   get mapName(): string {
@@ -225,6 +249,33 @@ export class GameRoom {
     this.broadcastRoomState();
   }
 
+  /**
+   * Respawn the vehicle at the last passed checkpoint (or spawn, if none has
+   * been passed yet), facing the correct direction, at rest. Rate-limited so
+   * a stuck-key or double-press can't spam resets. Any seated player can
+   * trigger it — this is a "we're stuck, let's continue" affordance, not a
+   * privileged action.
+   */
+  requestRecover(playerId: string): void {
+    const player = this.players.get(playerId);
+    if (!player || player.role === 'spectator') return;
+    if (this.tick - this.lastRecoveryTick < RECOVERY_COOLDOWN_TICKS) return;
+    this.applyRecovery('manual');
+  }
+
+  private applyRecovery(reason: 'manual' | 'out_of_bounds'): void {
+    setVehicleState(this.sim, {
+      x: this.recoveryPose.x,
+      y: this.recoveryPose.y,
+      angle: this.recoveryPose.angle,
+      vx: 0,
+      vy: 0,
+      angularVelocity: 0,
+    });
+    this.lastRecoveryTick = this.tick;
+    this.broadcast({ type: 'recovered', vehicle: snapshotVehicle(this.sim), reason });
+  }
+
   getPlayers(): PlayerInfo[] {
     return [...this.players.values()].map(({ id, role, name }) => ({ id, role, name }));
   }
@@ -255,7 +306,26 @@ export class GameRoom {
     stepSim(this.sim, combineSeatInputs(this.inputs.pilot, this.inputs.engineer), SIM_DT);
     this.tick++;
     const vehicle = snapshotVehicle(this.sim);
+
+    // Safety net: no legitimate position should ever be this far out — if it
+    // happens (a physics-tunneling edge case, since the closed road walls
+    // should already prevent it), recover automatically instead of leaving
+    // the car lost off-world.
+    if (isOutOfBounds(vehicle.x, vehicle.y)) {
+      this.applyRecovery('out_of_bounds');
+      return;
+    }
+
+    const prevNextGate = this.race.state(this.tick).nextCheckpoint;
     this.race.update(vehicle.x, vehicle.y, this.tick);
+    const newNextGate = this.race.state(this.tick).nextCheckpoint;
+    if (newNextGate !== prevNextGate && prevNextGate >= 0) {
+      // The gate at prevNextGate index was just passed — bank it as the
+      // recovery point (angle included, so recovering faces the right way).
+      const passed = this.map.checkpoints[prevNextGate];
+      if (passed) this.recoveryPose = { x: passed.x, y: passed.y, angle: passed.angle };
+    }
+
     if (this.tick % SNAPSHOT_EVERY_TICKS === 0) {
       const ack = { pilot: -1, engineer: -1 };
       for (const p of this.seatedPlayers()) ack[p.role as Seat] = p.lastInputSeq;

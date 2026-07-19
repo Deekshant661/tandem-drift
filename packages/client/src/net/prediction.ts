@@ -64,6 +64,20 @@ export class Predictor {
     this.stepTicks(input, TICKS_PER_INPUT);
   }
 
+  /**
+   * Hard reset for a teleport (manual/automatic recovery): snap straight to
+   * the given pose with no smoothing and drop all pending inputs, so the
+   * car doesn't glide back from wherever it was before the recovery.
+   */
+  hardReset(vehicle: VehicleSnapshot): void {
+    setVehicleState(this.sim, vehicle);
+    this.hasServerState = true;
+    this.pending = [];
+    this.errX = 0;
+    this.errY = 0;
+    this.errAngle = 0;
+  }
+
   /** Reconcile against an authoritative snapshot. */
   onSnapshot(msg: SnapshotMsg): void {
     const before = this.hasServerState ? snapshotVehicle(this.sim) : null;

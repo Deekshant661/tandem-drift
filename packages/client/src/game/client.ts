@@ -50,6 +50,12 @@ export class GameClient {
   } = { current: { steer: 0, throttle: 0, brake: 0, handbrake: false } };
   /** Collision impulse 0..1, set on snapshot velocity spikes; consumers decay it. */
   readonly fxRef: { collision: number } = { collision: 0 };
+  /** Bumped every time the server applies a recovery; UI watches this via
+   *  rAF to time the fade transition precisely instead of guessing latency. */
+  readonly recoveryRef: { version: number; reason: 'manual' | 'out_of_bounds' | null } = {
+    version: 0,
+    reason: null,
+  };
   private prevSnapVel: { vx: number; vy: number } | null = null;
 
   private state: GameState = {
@@ -94,6 +100,9 @@ export class GameClient {
         if (e.code === 'KeyH' && !e.repeat && this.state.phase === 'playing') {
           this.audio?.horn();
         }
+        if (e.code === 'KeyR' && !e.repeat) {
+          this.recover();
+        }
       });
       // If the URL carries a room code (shared link), auto-join.
       const urlRoom = new URL(location.href).searchParams.get('room');
@@ -134,6 +143,14 @@ export class GameClient {
     if (phase !== 'playing' || swapPending || !role || role === 'spectator') return;
     this.setState({ swapPending: true });
     this.conn?.send({ type: 'swapSeats' });
+  }
+
+  /** Request a respawn at the last passed checkpoint. Any seated player can
+   *  trigger it; the server rate-limits and ignores spectators. */
+  recover(): void {
+    const { role, phase } = this.state;
+    if (phase !== 'playing' || !role || role === 'spectator') return;
+    this.conn?.send({ type: 'recover' });
   }
 
   /** Sample predictor/interpolation into poseRef; called from useFrame. */
@@ -220,6 +237,18 @@ export class GameClient {
           this.predictor?.setSeat(msg.seat);
           this.setState({ role: msg.seat, swapPending: false });
           break;
+        case 'recovered': {
+          // Teleport: hard-snap prediction/interpolation to the new pose so
+          // nothing tries to glide back from the pre-recovery position.
+          this.predictor?.hardReset(msg.vehicle);
+          this.snapshots.reset();
+          const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+          this.snapshots.push(now, msg.vehicle);
+          this.fxRef.collision = 0;
+          this.recoveryRef.version++;
+          this.recoveryRef.reason = msg.reason;
+          break;
+        }
         case 'snapshot': {
           const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
           this.snapshots.push(now, msg.vehicle);
