@@ -34,7 +34,7 @@ function oak(): THREE.Object3D {
   return g;
 }
 
-const FLOWER_COLORS = ['#ff7ab6', '#ffd166', '#ff9f68', '#c78bff', '#ff6b6b'];
+export const FLOWER_COLORS = ['#ff7ab6', '#ffd166', '#ff9f68', '#c78bff', '#ff6b6b'];
 let flowerCounter = 0;
 
 function flower(): THREE.Object3D {
@@ -60,7 +60,7 @@ function rock(): THREE.Object3D {
   return mesh(new THREE.DodecahedronGeometry(0.8, 0), '#9aa3ad', 0.4);
 }
 
-const HOUSE_COLORS = ['#f2b53c', '#e2705d', '#7fb2e5', '#8fd08a', '#e5a8c8', '#d9c79a'];
+export const HOUSE_COLORS = ['#f2b53c', '#e2705d', '#7fb2e5', '#8fd08a', '#e5a8c8', '#d9c79a'];
 
 function house(idx: number): THREE.Object3D {
   const g = new THREE.Group();

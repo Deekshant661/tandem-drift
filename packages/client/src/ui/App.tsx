@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { getWorld } from '@tandem/shared';
 import { GameClient } from '../game/client.js';
 import { useGameClient } from '../game/store.js';
@@ -7,12 +7,23 @@ import { Lobby } from './Lobby.js';
 import { Hud } from './Hud.js';
 import { Minimap } from './Minimap.js';
 import { PauseMenu } from './PauseMenu.js';
+import { PerfOverlay } from './PerfOverlay.js';
+
+// Memoized so the entire 3D scene only re-renders when `client` or `world`
+// actually change (rarely) — not on every ~20Hz GameClient state tick, which
+// would otherwise re-run React's reconciliation over the whole scene graph.
+const MemoGameCanvas = memo(GameCanvas);
+const MemoMinimap = memo(Minimap);
 
 export function App(): JSX.Element {
   const client = useMemo(() => new GameClient(), []);
   useEffect(() => () => client.dispose(), [client]);
   const state = useGameClient(client);
-  const world = state.mapName ? getWorld(state.mapName) : null;
+  // getWorld() builds a fresh WorldMap object every call. Memoizing on
+  // mapName (not recomputing per render) is what lets RoadMesh/Gates/
+  // Environment's own useMemo(..., [world]) actually cache — without this,
+  // every snapshot triggered a full road + scenery rebuild from scratch.
+  const world = useMemo(() => (state.mapName ? getWorld(state.mapName) : null), [state.mapName]);
   const [paused, setPaused] = useState(false);
 
   useEffect(() => {
@@ -28,8 +39,8 @@ export function App(): JSX.Element {
       {state.phase === 'lobby' && <Lobby client={client} />}
       {state.phase === 'playing' && world && (
         <>
-          <GameCanvas client={client} world={world} />
-          <Minimap client={client} world={world} />
+          <MemoGameCanvas client={client} world={world} />
+          <MemoMinimap client={client} world={world} />
         </>
       )}
       {state.phase === 'playing' && !world && (
@@ -38,6 +49,7 @@ export function App(): JSX.Element {
         </div>
       )}
       <Hud client={client} />
+      <PerfOverlay />
       {paused && state.phase === 'playing' && (
         <PauseMenu client={client} onResume={() => setPaused(false)} />
       )}
