@@ -2,7 +2,9 @@
 
 A browser-based cooperative multiplayer game where **two players drive one car**:
 the **pilot** steers, the **engineer** works the throttle, brake, and handbrake.
-Physics-based, server-authoritative, chaos guaranteed.
+Physics-based, server-authoritative, chaos guaranteed — now in **3D**: a React
+Three Fiber chase-camera view over the flat authoritative 2D sim, driving the
+cozy countryside loop of **Willowbrook** (Phase 2, see `phase2.md`).
 
 See [plan.md](plan.md) for the full architecture, tradeoffs, and milestone roadmap.
 
@@ -50,9 +52,9 @@ delay adapts to measured network jitter.
 
 ```
 packages/
-├── shared/   # protocol, constants, and the vehicle physics sim (planck.js) — runs on both sides
+├── shared/   # protocol, physics sim (planck.js), WorldMap road-spline format + generators
 ├── server/   # authoritative Node server: rooms, seats, 60 Hz sim, 20 Hz snapshots (ws)
-└── client/   # Vite + PixiJS: rendering, input, snapshot interpolation
+└── client/   # Vite + React Three Fiber: 3D scene, chase camera, prediction, interpolation
 ```
 
 ## Configuration

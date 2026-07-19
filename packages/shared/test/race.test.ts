@@ -100,6 +100,6 @@ describe('track maps', () => {
     expect(getMap('track02').name).toBe('track02');
     expect(getMap(undefined).name).toBe(DEFAULT_MAP);
     expect(getMap('no-such-map').name).toBe('track01');
-    expect(Object.keys(PLAYABLE_MAPS)).toEqual(['track01', 'track02']);
+    expect(Object.keys(PLAYABLE_MAPS)).toEqual(['track01', 'track02', 'willowbrook']);
   });
 });

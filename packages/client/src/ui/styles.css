@@ -1,0 +1,116 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #10141c;
+  color: #e8ecf2;
+  font-family: system-ui, sans-serif;
+  overflow: hidden;
+}
+
+#hud {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  background: rgba(8, 10, 16, 0.75);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+  pointer-events: none;
+  z-index: 5;
+}
+#hud .code {
+  font-size: 20px;
+  letter-spacing: 3px;
+  font-weight: 700;
+  color: #7dd3fc;
+}
+#hud .seat-pilot {
+  color: #fbbf24;
+  font-weight: 600;
+}
+#hud .seat-engineer {
+  color: #34d399;
+  font-weight: 600;
+}
+
+#lobby {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #8ed0ff 0%, #cfe8ff 60%, #b8e6b0 100%);
+  z-index: 10;
+}
+#lobby form {
+  background: #ffffff;
+  border: 1px solid #d6e4f0;
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(30, 60, 90, 0.18);
+  padding: 28px 32px;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: #22344a;
+}
+#lobby h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  color: #0e7dd1;
+}
+#lobby label {
+  font-size: 13px;
+  color: #55708c;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#lobby input,
+#lobby select {
+  background: #f4f9ff;
+  color: #22344a;
+  border: 1px solid #c8d9ea;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 15px;
+}
+#lobby input#room-code {
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+#lobby button {
+  padding: 10px;
+  border: 0;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+#lobby #create-btn {
+  background: #0ea5e9;
+  color: #ffffff;
+}
+#lobby #join-btn {
+  background: #e5eef7;
+  color: #22344a;
+}
+#lobby .hint {
+  font-size: 12px;
+  color: #7a92aa;
+  margin: 0;
+}
+
+.notice {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(8, 10, 16, 0.8);
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  z-index: 5;
+}
