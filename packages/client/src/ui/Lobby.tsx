@@ -15,10 +15,16 @@ export function Lobby({ client }: { client: GameClient }): JSX.Element {
   const playerName = (): string =>
     name.trim() || `Player-${Math.floor(Math.random() * 1000)}`;
 
-  const create = (): void => client.join({ name: playerName(), map });
+  const create = (): void => {
+    client.audio?.click();
+    client.join({ name: playerName(), map });
+  };
   const join = (): void => {
     const roomCode = code.trim().toUpperCase();
-    if (roomCode.length === 6) client.join({ name: playerName(), roomCode, map });
+    if (roomCode.length === 6) {
+      client.audio?.click();
+      client.join({ name: playerName(), roomCode, map });
+    }
   };
 
   return (
