@@ -2,46 +2,43 @@ import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { mulberry32, type WorldMap, type Zone } from '@tandem/shared';
-import { scatterWorld, type Placement } from './scatter.js';
+import { scatterWorld } from './scatter.js';
 import { buildProp } from './props.js';
+import { buildInstancedProps, isIndividuallyBuilt } from './instancing.js';
 
 /**
- * All Willowbrook scenery, grouped by zone into independently mountable
- * chunks (streaming-ready: future larger maps can load/unload zone groups
- * without architectural changes). Everything is deterministic from the world
- * seed, so both players see the identical countryside.
+ * All Willowbrook scenery. Non-house props (trees, flowers, grass, rocks,
+ * fences, lamps, hay, benches, mailboxes, crates, cones — hundreds of
+ * placements) render as a handful of GPU-instanced meshes grouped by kind.
+ * Houses (few, highly varied) stay individually built. Everything is
+ * deterministic from the world seed, so both players see the identical
+ * countryside, and it's all built once in useMemo — never per frame.
  */
 export function Environment({ world }: { world: WorldMap }): JSX.Element {
-  const zoneGroups = useMemo(() => {
+  const { instancedGroup, houseGroup } = useMemo(() => {
     const placements = scatterWorld(world);
-    const byZone = new Map<string, Placement[]>();
-    for (const p of placements) {
-      const list = byZone.get(p.zone) ?? [];
-      list.push(p);
-      byZone.set(p.zone, list);
+
+    const houses = new THREE.Group();
+    houses.name = 'houses';
+    for (const p of placements.filter((p) => isIndividuallyBuilt(p.kind))) {
+      const obj = buildProp(p.kind);
+      obj.position.set(p.x, 0, -p.y);
+      obj.rotation.y = p.rotation;
+      obj.scale.setScalar(p.scale);
+      houses.add(obj);
     }
-    // Build one THREE.Group per zone; static, so build imperatively once.
-    const groups: THREE.Group[] = [];
-    for (const [zone, list] of byZone) {
-      const g = new THREE.Group();
-      g.name = `zone-${zone}`;
-      for (const p of list) {
-        const obj = buildProp(p.kind);
-        obj.position.set(p.x, 0, -p.y);
-        obj.rotation.y = p.rotation;
-        obj.scale.setScalar(p.scale);
-        g.add(obj);
-      }
-      groups.push(g);
-    }
-    return groups;
+
+    const instanced = new THREE.Group();
+    instanced.name = 'instanced-props';
+    for (const mesh of buildInstancedProps(placements)) instanced.add(mesh);
+
+    return { instancedGroup: instanced, houseGroup: houses };
   }, [world]);
 
   return (
     <group>
-      {zoneGroups.map((g) => (
-        <primitive key={g.name} object={g} />
-      ))}
+      <primitive object={instancedGroup} />
+      <primitive object={houseGroup} />
       <Lake world={world} />
       <Landmarks world={world} />
       <Clouds seed={world.seed} />
@@ -49,7 +46,7 @@ export function Environment({ world }: { world: WorldMap }): JSX.Element {
   );
 }
 
-/** Flat water disc + darker shore ring for the lake zone. */
+/** Flat water disc + shore ring for the lake zone. */
 function Lake({ world }: { world: WorldMap }): JSX.Element | null {
   const lake = world.zones.find((z: Zone) => z.kind === 'lake');
   if (!lake) return null;
@@ -83,7 +80,6 @@ function Landmarks({ world }: { world: WorldMap }): JSX.Element {
     <group>
       {windmills.map((w, i) => (
         <group key={`wm${i}`} position={[w.x, 0, -w.y]} rotation-y={w.rotation}>
-          {/* tower */}
           <mesh castShadow position-y={4}>
             <cylinderGeometry args={[1.2, 2.0, 8, 8]} />
             <meshStandardMaterial color="#e8dcc3" flatShading />
@@ -92,7 +88,6 @@ function Landmarks({ world }: { world: WorldMap }): JSX.Element {
             <coneGeometry args={[1.5, 1.6, 8]} />
             <meshStandardMaterial color="#a34d3f" flatShading />
           </mesh>
-          {/* hub + 4 blades */}
           <group position={[0, 7.6, 1.6]} ref={(el) => (bladeRefs.current[i] = el)}>
             {[0, 1, 2, 3].map((b) => (
               <mesh key={b} rotation-z={(b * Math.PI) / 2} position-y={0}>
@@ -105,7 +100,6 @@ function Landmarks({ world }: { world: WorldMap }): JSX.Element {
       ))}
       {bridges.map((b, i) => (
         <group key={`br${i}`} position={[b.x, 0, -b.y]} rotation-y={b.rotation}>
-          {/* deck slightly above the road surface, wooden rails both sides */}
           <mesh position-y={0.06}>
             <boxGeometry args={[18, 0.12, 9.5]} />
             <meshStandardMaterial color="#a87f52" />

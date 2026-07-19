@@ -21,7 +21,9 @@ room; its code appears in the HUD (and in the URL). Open the same URL in a
 second tab/browser to take the second seat.
 
 **Controls** — Pilot: `A`/`D` steer. Engineer: `W` throttle, `S` brake, `Space` handbrake.
-`Tab` seat swap (both must press) · `C` look back · `H` horn · `Esc` pause menu.
+`Tab` seat swap (both must press) · `C` look back · `H` horn · `Esc` pause menu ·
+`P` toggles a live performance overlay (FPS, frame time, draw calls, triangles,
+GPU resource counts, JS heap).
 
 **Racing** — the room runs the "First Date" circuit: pass the glowing green gate
 next; lapping the yellow start/finish gate records last/best lap times in the HUD.
