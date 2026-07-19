@@ -42,8 +42,35 @@ export function composeInstanceMatrix(
   return m.multiply(localMatrix);
 }
 
+/** Deterministic pseudo-random in [0,1) from an integer — no live RNG state,
+ *  so the same placements array always yields the same color variety. */
+function hash01(i: number): number {
+  const x = Math.sin(i * 127.1 + 311.7) * 43758.5453123;
+  return x - Math.floor(x);
+}
+
 /** Kinds rendered individually (few in number, high per-instance variety). */
 const NOT_INSTANCED: ReadonlySet<PropKind> = new Set(['house']);
+
+/** Foliage/ground kinds whose color gets natural per-instance variation
+ *  (so a stand of pines isn't fifty identical clones). Trunks and man-made
+ *  props (fences, lamps...) are intentionally excluded — uniform there
+ *  reads as "built," not "flat." */
+const COLOR_VARIABLE: ReadonlySet<PropKind> = new Set(['pine', 'oak', 'bush', 'grass', 'rock']);
+
+const tmpHSL = { h: 0, s: 0, l: 0 };
+
+/** Jitter a base color's hue/saturation/lightness deterministically per instance. */
+function variedColor(base: THREE.Color, seed: number, out: THREE.Color): THREE.Color {
+  base.getHSL(tmpHSL);
+  const jitter = hash01(seed) - 0.5;
+  const jitter2 = hash01(seed * 3.1 + 5) - 0.5;
+  return out.setHSL(
+    (tmpHSL.h + jitter * 0.03 + 1) % 1,
+    THREE.MathUtils.clamp(tmpHSL.s + jitter2 * 0.12, 0, 1),
+    THREE.MathUtils.clamp(tmpHSL.l + jitter * 0.14, 0.05, 0.95),
+  );
+}
 
 /**
  * Build one InstancedMesh per (kind, mesh-part) covering every placement of
@@ -70,12 +97,14 @@ export function buildInstancedProps(placements: Placement[]): THREE.Object3D[] {
     const parts = flattenTemplate(buildProp(kind));
     parts.forEach((part, partIndex) => {
       const isFlowerBloom = kind === 'flower' && partIndex === parts.length - 1;
+      const varyColor = isFlowerBloom || COLOR_VARIABLE.has(kind);
       const count = list.length;
       const instMesh = new THREE.InstancedMesh(part.geometry, part.material.clone(), count);
       instMesh.frustumCulled = false;
       instMesh.castShadow = false;
       instMesh.receiveShadow = false;
-      if (isFlowerBloom) {
+      const baseColor = (part.material as THREE.MeshStandardMaterial).color?.clone() ?? new THREE.Color('#ffffff');
+      if (varyColor) {
         instMesh.instanceColor = new THREE.InstancedBufferAttribute(
           new Float32Array(count * 3),
           3,
@@ -87,6 +116,8 @@ export function buildInstancedProps(placements: Placement[]): THREE.Object3D[] {
         if (isFlowerBloom) {
           tmpColor.set(FLOWER_COLORS[i % FLOWER_COLORS.length]!);
           instMesh.setColorAt(i, tmpColor);
+        } else if (varyColor) {
+          instMesh.setColorAt(i, variedColor(baseColor, i * 131 + partIndex * 977, tmpColor));
         }
       });
       instMesh.instanceMatrix.needsUpdate = true;
