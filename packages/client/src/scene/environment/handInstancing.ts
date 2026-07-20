@@ -87,7 +87,17 @@ export async function buildHandInstancedGroups(
   const tmpColor = new THREE.Color();
 
   for (const [assetKey, list] of byAsset) {
-    const parts = await resolveTemplate(list[0]!.asset);
+    // A single missing/broken model must never blank out the rest of the
+    // scene — isolate failures per asset instead of letting one rejected
+    // fetch kill the whole batch (this exact failure mode is what made
+    // every real-asset placement in Fernvale invisible after a path bug).
+    let parts;
+    try {
+      parts = await resolveTemplate(list[0]!.asset);
+    } catch (err) {
+      console.error(`[fernvale] failed to load asset for placement group "${assetKey}":`, err);
+      continue;
+    }
     const swayable = SWAYABLE_PATTERN.test(assetKey);
     for (const part of parts) {
       const count = list.length;

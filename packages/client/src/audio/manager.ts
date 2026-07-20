@@ -25,6 +25,8 @@ export class AudioManager {
   private skidGain: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
   private ambient: Record<'village' | 'forest' | 'lake' | 'fields', GainNode> | null = null;
+  private windGain: GainNode | null = null;
+  private tireGain: GainNode | null = null;
 
   start(): void {
     if (this.ctx) return;
@@ -76,6 +78,33 @@ export class AudioManager {
     skidSrc.start();
 
     this.ambient = this.makeAmbientLayer(ctx, buf, master);
+
+    // Wind rush and tire roll — the two layers that should take over from
+    // the engine as speed rises, so top speed sounds like genuine motion
+    // through air, not just a louder motor. Both react to update()/speedMs.
+    const windSrc = ctx.createBufferSource();
+    windSrc.buffer = buf;
+    windSrc.loop = true;
+    const windFilter = ctx.createBiquadFilter();
+    windFilter.type = 'highpass';
+    windFilter.frequency.value = 1100;
+    windFilter.Q.value = 0.3;
+    this.windGain = ctx.createGain();
+    this.windGain.gain.value = 0;
+    windSrc.connect(windFilter).connect(this.windGain).connect(master);
+    windSrc.start();
+
+    const tireSrc = ctx.createBufferSource();
+    tireSrc.buffer = buf;
+    tireSrc.loop = true;
+    const tireFilter = ctx.createBiquadFilter();
+    tireFilter.type = 'bandpass';
+    tireFilter.frequency.value = 450;
+    tireFilter.Q.value = 0.7;
+    this.tireGain = ctx.createGain();
+    this.tireGain.gain.value = 0;
+    tireSrc.connect(tireFilter).connect(this.tireGain).connect(master);
+    tireSrc.start();
   }
 
   /**
@@ -159,19 +188,43 @@ export class AudioManager {
     };
   }
 
-  /** Per-tick update: three engine bands crossfade by speed with limited,
-   *  independent pitch ranges; the skid loop gates on drift state. */
+  /**
+   * Per-tick update. Three engine bands crossfade by speed, but their
+   * combined presence is deliberately dialed BACK as speed rises (via
+   * `engineFade`) while wind and tire-roll noise grow — the goal, per
+   * direction feedback, is the opposite of "the engine gets louder and
+   * shriller with speed": at the top of the speed range, rushing air and
+   * road noise should be what you actually notice, with the engine
+   * receding into the background exactly like a real car.
+   */
   update(speedMs: number, skidding: boolean): void {
     if (!this.ctx || this.bands.length === 0 || !this.skidGain) return;
     const t = this.ctx.currentTime;
-    const norm = Math.min(1, speedMs / 30);
+    // 37 m/s (~132 km/h) is the car's actual measured terminal velocity
+    // under the shared sim's aerodynamic drag — norm now reaches 1 only at
+    // genuine top speed, instead of pinning "flat out" a third of the way
+    // there (the old 30 m/s ceiling, back when top speed was unbounded).
+    const norm = Math.min(1, speedMs / 37);
     const smoothing = 0.12;
 
+    // Engine presence fades from 100% at a standstill to 55% at top speed —
+    // still audible, but no longer the dominant sound.
+    const engineFade = 1 - norm * 0.45;
     for (const band of this.bands) {
       const weight = bandWeight(norm, band.center, band.width);
-      band.gain.gain.setTargetAtTime(band.peakGain * weight, t, smoothing);
+      band.gain.gain.setTargetAtTime(band.peakGain * weight * engineFade, t, smoothing);
       const freq = band.baseFreq + norm * band.freqRange;
       band.osc.frequency.setTargetAtTime(freq, t, smoothing);
+    }
+
+    // Wind builds up faster than linearly — barely there at low speed,
+    // clearly the loudest layer by top speed.
+    if (this.windGain) {
+      this.windGain.gain.setTargetAtTime(norm * norm * 0.22, t, smoothing);
+    }
+    // Tire roll: present at moderate-to-high speed, quiet at a crawl.
+    if (this.tireGain) {
+      this.tireGain.gain.setTargetAtTime(Math.max(0, norm - 0.15) * 0.07, t, smoothing);
     }
 
     this.skidGain.gain.setTargetAtTime(skidding && speedMs > 4 ? 0.12 : 0, t, 0.05);

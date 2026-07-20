@@ -41,6 +41,12 @@ export const VEHICLE_TUNING = {
   gripHandbrake: 0.18,
   linearDamping: 0.35,
   angularDamping: 3.0,
+  /** Speed-squared aerodynamic drag coefficient — without this, drive force
+   *  and linear damping alone let a car climb toward an unreasonable top
+   *  speed on any long straight (measured: ~350 km/h). This caps terminal
+   *  velocity under full throttle to a sane, still-fast arcade top speed
+   *  (~130 km/h) via a proper physical drag term, not a hard clamp. */
+  airDragCoeff: 2.6,
 } as const;
 
 export interface SimWorld {
@@ -96,6 +102,16 @@ export function stepSim(sim: SimWorld, input: ControlInput, dt: number): void {
   // 2. Drive.
   if (input.throttle > 0 && !input.handbrake) {
     body.applyForceToCenter(forward.clone().mul(input.throttle * t.maxDriveForce), true);
+  }
+
+  // 2b. Aerodynamic drag, proportional to speed squared, always opposing
+  //     current velocity — gives a real, physical terminal velocity instead
+  //     of letting speed climb without bound on a long straight.
+  const speedNow = vel.length();
+  if (speedNow > 0.01) {
+    const dragMag = t.airDragCoeff * speedNow * speedNow;
+    const dragForce = vel.clone().mul(-dragMag / speedNow);
+    body.applyForceToCenter(dragForce, true);
   }
 
   // 3. Brake: force opposing forward velocity (never reverses through zero

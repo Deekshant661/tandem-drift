@@ -61,6 +61,29 @@ describe('terrainHeight', () => {
     }
   });
 
+  it('a cliff stays local to its segment — it must never affect terrain far along the line beyond its own ends', () => {
+    // Regression test for a real bug: the cliff's escarpment was computed as
+    // an infinite line, so it silently dropped/raised the entire map on one
+    // side of that line, however far from the authored feature — making
+    // every off-road stretch of the world look like one giant slope.
+    const cliff: TerrainFeature = {
+      kind: 'cliff',
+      x1: 20,
+      y1: 50,
+      x2: 20,
+      y2: 100,
+      drop: 20,
+      blend: 10,
+    };
+    // Far beyond the segment's own ends (y well outside [50, 100]), on the
+    // "dropped" side (x < 20) — an infinite-line implementation would still
+    // apply a large drop here; a properly bounded one must not.
+    const farBeyondStart = terrainHeight(0, -500, road, [cliff], 1);
+    const farBeyondEnd = terrainHeight(0, 600, road, [cliff], 1);
+    expect(Math.abs(farBeyondStart)).toBeLessThan(0.5);
+    expect(Math.abs(farBeyondEnd)).toBeLessThan(0.5);
+  });
+
   it('is deterministic for the same seed', () => {
     const a = terrainHeight(55, 55, road, [], 7);
     const b = terrainHeight(55, 55, road, [], 7);

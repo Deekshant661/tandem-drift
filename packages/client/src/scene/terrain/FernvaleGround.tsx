@@ -5,8 +5,12 @@ import { terrainHeight, type RoadFlattenPoint } from './heightfield.js';
 import { FERNVALE_TERRAIN_FEATURES } from './fernvaleTerrainFeatures.js';
 import { atmosphereAt } from '../environment/fernvaleAtmosphere.js';
 
-const GRID_SIZE = 240; // meters, covers the ~150m-radius loop plus margin
-const GRID_RES = 96; // vertices per side — one draw call, no per-frame cost
+// The road loop itself spans roughly x:[-135,118] y:[-115,120], and the
+// authored background hills sit further out still (e.g. y=210, x=-175) —
+// GRID_SIZE must clear all of that or those hills silently render nowhere
+// (a real bug: the previous 240m grid didn't reach several of them at all).
+const GRID_SIZE = 560;
+const GRID_RES = 128; // vertices per side — one draw call, no per-frame cost
 
 /**
  * Fernvale's heightmapped ground: flat exactly on the road corridor,

@@ -1,10 +1,19 @@
 import type { AssetDescriptor } from '../assets/types.js';
 import { buildProp } from './props.js';
 
-/** Real Kenney glTF assets used across Fernvale (see public/assets/CREDITS.md). */
-const p = (name: string): AssetDescriptor => ({ kind: 'gltf', url: `/assets/models/props/${name}` });
-const b = (name: string): AssetDescriptor => ({ kind: 'gltf', url: `/assets/models/buildings/${name}` });
-const v = (name: string): AssetDescriptor => ({ kind: 'gltf', url: `/assets/models/vehicles/${name}` });
+/**
+ * Real Kenney glTF assets used across Fernvale (see public/assets/CREDITS.md).
+ *
+ * Paths are relative (no leading slash) on purpose: this app is deployed
+ * under a subpath (GitHub Pages serves it at /tandem-drift/, not domain
+ * root), so an absolute path like "/assets/..." resolves against the
+ * domain root and 404s. A relative path resolves against the page's own
+ * directory regardless of where it's mounted — works identically in local
+ * dev (served at "/") and in production (served at "/tandem-drift/").
+ */
+const p = (name: string): AssetDescriptor => ({ kind: 'gltf', url: `assets/models/props/${name}` });
+const b = (name: string): AssetDescriptor => ({ kind: 'gltf', url: `assets/models/buildings/${name}` });
+const v = (name: string): AssetDescriptor => ({ kind: 'gltf', url: `assets/models/vehicles/${name}` });
 
 /** A handful of Willowbrook's procedural builders, reused for the few
  *  vignette items Kenney's kits didn't have a good fit for (mailbox, lamp
