@@ -77,6 +77,20 @@ describe('vehicle simulation', () => {
     expect(Math.abs(s.y)).toBeLessThan(50);
   });
 
+  it('has a sane, bounded terminal velocity under full throttle on an open straight', () => {
+    // Regression test for a real bug: without aerodynamic drag, speed
+    // climbed unbounded on a long straight (measured ~350 km/h in-game,
+    // absurd for a cozy arcade game and audibly harsh since the engine
+    // audio's speed normalization also assumed a much lower ceiling).
+    const openMap = { name: 'x', spawn: { x: 0, y: 0, angle: 0 }, walls: [], checkpoints: [] };
+    const sim = createSimWorld(openMap);
+    run(sim, { throttle: 1 }, 60 * 9); // 9 s — long enough to reach equilibrium
+    const s = snapshotVehicle(sim);
+    const speedKmh = Math.hypot(s.vx, s.vy) * 3.6;
+    expect(speedKmh).toBeGreaterThan(100); // still feels genuinely fast
+    expect(speedKmh).toBeLessThan(160); // but never runs away unbounded
+  });
+
   it('combines seat inputs with correct ownership', () => {
     const pilot: ControlInput = { steer: -1, throttle: 1, brake: 1, handbrake: true };
     const engineer: ControlInput = { steer: 1, throttle: 0.5, brake: 0.2, handbrake: false };

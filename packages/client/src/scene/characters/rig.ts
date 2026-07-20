@@ -36,7 +36,8 @@ export interface RigPose {
 }
 
 export function computeRigPose(i: RigInput): RigPose {
-  const speedNorm = Math.min(1, i.speed / 30);
+  // 37 m/s (~132 km/h) is the car's real terminal velocity under drag.
+  const speedNorm = Math.min(1, i.speed / 37);
   // Idle breathing + speed-scaled road bounce; seats desync via phase offset.
   const phase = i.seat === 'pilot' ? 0 : 1.3;
   const bounceY =

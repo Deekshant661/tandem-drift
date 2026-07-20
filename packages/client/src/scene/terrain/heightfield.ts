@@ -24,9 +24,12 @@ export type TerrainFeature =
 
 /** Extra distance beyond the road edge before terrain is allowed to rise —
  *  the "no wall of dirt at the tires" guarantee. */
-const ROAD_MARGIN = 6;
-/** Distance over which flatness blends into full terrain height. */
-const FALLOFF_DISTANCE = 22;
+const ROAD_MARGIN = 8;
+/** Distance over which flatness blends into full terrain height. Generous
+ *  on purpose: hills/cliffs authored at 17-26m tall need real horizontal
+ *  room to ramp up in, or they read as a steep wall right next to the car
+ *  instead of distant depth (a 20m rise over ~20m was exactly that bug). */
+const FALLOFF_DISTANCE = 45;
 
 function smoothstep(t: number): number {
   const c = Math.min(1, Math.max(0, t));
@@ -54,16 +57,29 @@ function featureHeight(x: number, y: number, feature: TerrainFeature): number {
       return -feature.depth * smoothstep(1 - d / feature.radius);
     }
     case 'cliff': {
-      // Signed perpendicular distance from the escarpment line.
+      // Signed perpendicular distance from the escarpment LINE, plus the
+      // position projected ALONG it — a cliff must stay a local feature
+      // near its authored segment, not an infinite line that drops the
+      // entire map on one side of it (a real bug this caught: an unbounded
+      // line was silently applying a full-height drop everywhere far from
+      // where the feature was ever meant to be visible).
       const dx = feature.x2 - feature.x1;
       const dy = feature.y2 - feature.y1;
       const len = Math.hypot(dx, dy) || 1;
       const nx = -dy / len;
       const ny = dx / len;
+      const ax = dx / len;
+      const ay = dy / len;
       const signed = (x - feature.x1) * nx + (y - feature.y1) * ny;
+      const along = (x - feature.x1) * ax + (y - feature.y1) * ay;
       // signed > 0 is the high side (no drop yet); signed < 0 is fully
       // dropped; the blend band straddles signed = 0.
-      return -feature.drop * smoothstep(0.5 - signed / feature.blend);
+      const dropFactor = smoothstep(0.5 - signed / feature.blend);
+      // Taper to 0 beyond the segment's own ends (using the same blend
+      // width), so the cliff reads as one local escarpment, not a wall
+      // across the whole world.
+      const endFactor = smoothstep(along / feature.blend) * smoothstep((len - along) / feature.blend);
+      return -feature.drop * dropFactor * endFactor;
     }
   }
 }

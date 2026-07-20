@@ -67,7 +67,8 @@ export function Vehicle({
       rand.x = 0;
       rand.z = 0;
     }
-    const speedNorm = Math.min(1, speed / 30);
+    // 37 m/s (~132 km/h) is the car's real terminal velocity under drag.
+    const speedNorm = Math.min(1, speed / 37);
     b.position.y =
       0.02 * speedNorm * Math.sin(performance.now() * 0.02 * (1 + speedNorm)) +
       jolt * 0.1 +
