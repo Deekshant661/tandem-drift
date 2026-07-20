@@ -87,7 +87,7 @@ export function GameCanvas({
       <RoadMesh world={world} />
       <Gates client={client} world={world} />
       <Vehicle client={client} spec={compact01} />
-      {isFernvale ? <FernvaleEnvironment /> : <Environment world={world} />}
+      {isFernvale ? <FernvaleEnvironment world={world} /> : <Environment world={world} />}
       <Particles client={client} />
       <SkidMarks client={client} />
       <ChaseCamera client={client} />

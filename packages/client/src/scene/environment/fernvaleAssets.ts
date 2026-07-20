@@ -72,4 +72,5 @@ export const FERNVALE_ASSETS = {
   mailbox: proc('mailbox'),
   lamp: proc('lamp'),
   hay: proc('hay'),
+  radioMast: proc('radioMast'),
 } as const;
