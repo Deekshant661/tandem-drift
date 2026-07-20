@@ -35,10 +35,34 @@ blend, and a short list of **named landmarks** for player orientation — but
 nothing in the built world should read as a discrete "zone."
 
 **The road is the star.** More design effort goes into the corner sequence
-than into prop placement. The loop mixes: tight corners, sweeping bends,
-short straights, narrow sections, open sections, and elevation *illusions*
-(hillside cuttings, a rise toward a lookout) that never require the flat
-physics to actually climb.
+than into prop placement — designed by hand, not generated mathematically,
+and never a string of repetitive S-curves. The loop includes, each once and
+each for a reason: one memorable hairpin, one fast sweeping corner, one
+blind-crest illusion, one technical chicane, one long relaxing straight,
+one scenic overlook, and one narrow bridge approach — plus elevation
+*illusions* (hillside cuttings, a rise toward a lookout) that never require
+the flat physics to actually climb.
+
+**Road width varies with place, not just decoration varies with place.**
+Wider through the village; narrow at the bridge crossing; slightly
+narrower through the forest; wide again at the lakeside scenic stretch;
+narrow at the technical corners; wide through the open farmland sweepers.
+Subtle, continuous (same blending approach as the atmosphere function),
+and never so narrow it hurts gameplay readability.
+
+**The road surface itself has quiet variation**, not just a flat asphalt
+color: subtle patched-asphalt tone variation, gently faded lane markings
+(more faded on long-unused stretches), gravel shoulders blending to dirt
+blending to grass, and grass creeping slightly at the road's edge.
+Believable wear, not damage.
+
+**Camera composition is a placement input, not an afterthought.** Corners
+and landmarks are placed with the chase camera's framing in mind —
+driving toward the sunset on the long straight, the road briefly framed by
+trees before the bridge, the lake revealed coming out of the sweeper, the
+distant windmill appearing over the rise into the fields. The chase camera
+should produce a "postcard" moment on a regular cadence through the lap,
+not by accident.
 
 **Negative space is deliberate.** Sky, lake, and mountains need room to
 read. Fewer, well-placed objects beat filled space — Willowbrook's
@@ -57,6 +81,25 @@ shader-driven (a single time uniform, zero CPU cost) or a handful of
 instances (never per-frame CPU work across hundreds of objects) — this
 phase follows directly after a performance-fix milestone and must not
 regress it.
+
+**Ambient audio follows the same continuous blend as everything else** —
+no music, nothing loud, just soft area-appropriate sound that fades in/out
+with `atmosphereAt`: distant birds and soft wind near the village, insects
+and birds in the forest, water and wind at the lake, wind and windmill
+creaks in the fields. An extension of the existing `AudioManager`
+crossfade approach, not a new audio system.
+
+**No visible repetition.** Every repeated placement (trees, fence posts,
+flower clumps) gets randomized rotation, slight scale jitter, and a touch
+of color-tint variation — the instancing pipeline already does exactly
+this for Willowbrook's foliage (Phase 2's per-instance HSL jitter); Fernvale's
+hand-placed repeats reuse the same mechanism rather than placing identical
+clones.
+
+**Environmental storytelling, not random props.** A handful of small,
+specific vignettes rather than generic scatter: a bicycle leaned against a
+house, a parked tractor at the farmland edge, a picnic bench by the lake, a
+stacked woodpile, a flower-filled mailbox. Each placed once, on purpose.
 
 ## Architecture
 
@@ -141,6 +184,24 @@ One lake: a gently animated shader (shimmer/ripple via a time-driven normal
 perturbation and a soft specular highlight) — no real-time reflections or
 simulation. Cheap, static geometry, one material.
 
+### 7a. Lighting as a defining character
+
+Not just "warm lighting" — a warm, late-afternoon golden-hour treatment is
+the single biggest lever for making Fernvale instantly recognizable from
+one screenshot: long soft shadows, rich warm sky color, gentle contrast.
+Builds on Phase 2's directional-light/hemisphere/bloom setup — tuned
+harder toward golden-hour specifically for this map (Willowbrook keeps its
+current midday treatment; per-map lighting is just different prop values
+to the same `GameCanvas`, no new system).
+
+### 7b. Ambient audio: extends `packages/client/src/audio/manager.ts`
+
+Same continuous-blend mechanism as the visual atmosphere (§3), applied to a
+small set of soft area-appropriate loops (birds/wind/village bell; forest
+insects/birds; lake water/wind; field wind/windmill creak) — never music,
+never loud, crossfaded by `atmosphereAt`'s position exactly like the
+existing engine-band crossfade.
+
 ### 8. Ambient life: `packages/client/src/scene/environment/AmbientLife.tsx`
 
 - Windmill blades: already animated (Phase 2), reused.
@@ -194,3 +255,6 @@ simulation. Cheap, static geometry, one material.
   use it as the template for additional maps.
 - Consider promoting Fernvale to `DEFAULT_MAP` once validated.
 - Real vehicle/character assets, deferred per this phase's explicit scope.
+- Working name "Fernvale" is a placeholder; a more distinctive name (e.g.
+  Bramble Valley, Pine Hollow, Clover Ridge) is worth adopting once the map
+  proves out — not blocking this phase.
