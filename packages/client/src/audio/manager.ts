@@ -24,6 +24,7 @@ export class AudioManager {
   private bands: EngineBand[] = [];
   private skidGain: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
+  private ambient: Record<'village' | 'forest' | 'lake' | 'fields', GainNode> | null = null;
 
   start(): void {
     if (this.ctx) return;
@@ -73,6 +74,53 @@ export class AudioManager {
     this.skidGain.gain.value = 0;
     skidSrc.connect(bp).connect(this.skidGain).connect(master);
     skidSrc.start();
+
+    this.ambient = this.makeAmbientLayer(ctx, buf, master);
+  }
+
+  /**
+   * Four soft, continuous area loops (village/forest/lake/fields) — never
+   * music, never loud — individually gain-crossfaded by updateAmbient()
+   * using the same continuous position blend as the visual atmosphere.
+   * No new synthesis idea here, just more filtered-noise loops layered at
+   * very low gain, exactly like the existing skid loop.
+   */
+  private makeAmbientLayer(
+    ctx: AudioContext,
+    noise: AudioBuffer,
+    master: AudioNode,
+  ): Record<'village' | 'forest' | 'lake' | 'fields', GainNode> {
+    const makeLoop = (filterType: BiquadFilterType, freq: number, q: number): GainNode => {
+      const src = ctx.createBufferSource();
+      src.buffer = noise;
+      src.loop = true;
+      const filter = ctx.createBiquadFilter();
+      filter.type = filterType;
+      filter.frequency.value = freq;
+      filter.Q.value = q;
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      src.connect(filter).connect(gain).connect(master);
+      src.start();
+      return gain;
+    };
+    return {
+      village: makeLoop('bandpass', 1400, 0.6), // soft wind + distant birds register
+      forest: makeLoop('bandpass', 2600, 0.9), // higher, chirpier insect/bird register
+      lake: makeLoop('lowpass', 500, 0.5), // soft water/wind register
+      fields: makeLoop('bandpass', 800, 0.4), // low open-wind register
+    };
+  }
+
+  /** Crossfade the four ambient loops by each area's current influence
+   *  (0..1, same blend the visual atmosphere uses) — subtle, never loud. */
+  updateAmbient(weights: { village: number; forest: number; lake: number; fields: number }): void {
+    if (!this.ctx || !this.ambient) return;
+    const t = this.ctx.currentTime;
+    this.ambient.village.gain.setTargetAtTime(weights.village * 0.05, t, 0.6);
+    this.ambient.forest.gain.setTargetAtTime(weights.forest * 0.045, t, 0.6);
+    this.ambient.lake.gain.setTargetAtTime(weights.lake * 0.06, t, 0.6);
+    this.ambient.fields.gain.setTargetAtTime(weights.fields * 0.045, t, 0.6);
   }
 
   private makeBand(

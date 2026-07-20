@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { GameClient } from '../game/client.js';
 
 const MAPS = [
+  { value: 'fernvale', label: 'Fernvale — handcrafted showcase drive (3D)' },
   { value: 'willowbrook', label: 'Willowbrook — cozy countryside (3D)' },
   { value: 'track01', label: 'First Date — classic circuit (2D legacy)' },
   { value: 'track02', label: 'The Squeeze — narrow circuit (2D legacy)' },
@@ -9,7 +10,7 @@ const MAPS = [
 
 export function Lobby({ client }: { client: GameClient }): JSX.Element {
   const [name, setName] = useState('');
-  const [map, setMap] = useState('willowbrook');
+  const [map, setMap] = useState('fernvale');
   const [code, setCode] = useState('');
 
   const playerName = (): string =>

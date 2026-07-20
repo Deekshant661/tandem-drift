@@ -1,7 +1,9 @@
 import {
+  fernvale,
   getWorld,
   INPUT_SEND_HZ,
   INTERPOLATION_DELAY_MS,
+  sampleRoad,
   worldToTrackMap,
   getMap,
   type PlayerInfo,
@@ -9,6 +11,7 @@ import {
   type Role,
   type VehicleSnapshot,
 } from '@tandem/shared';
+import { waypointWeights } from '../scene/environment/fernvaleAtmosphere.js';
 import { Connection } from '../net/connection.js';
 import { SnapshotBuffer } from '../net/interpolation.js';
 import { Predictor } from '../net/prediction.js';
@@ -295,7 +298,46 @@ export class GameClient {
     this.hudTimer = setInterval(() => {
       this.setState({ rttMs: this.conn?.rttMs ?? 0 });
       this.audio?.update(this.state.speedKmh / 3.6, this.controlsRef.current.handbrake);
+      this.updateAmbientAudio();
     }, 250);
+  }
+
+  private fernvaleRoadSamples: ReturnType<typeof sampleRoad> | null = null;
+
+  /** Fernvale-only: crossfade the four ambient loops by the car's current
+   *  position along the road, mirroring the visual atmosphere blend. */
+  private updateAmbientAudio(): void {
+    if (this.state.mapName !== 'fernvale' || !this.audio) return;
+    const pose = this.poseRef.current;
+    if (!pose) return;
+    if (!this.fernvaleRoadSamples) {
+      this.fernvaleRoadSamples = sampleRoad(fernvale().roads[0]!, 8);
+    }
+    const samples = this.fernvaleRoadSamples;
+    let bestDist = Infinity;
+    let cumAtBest = 0;
+    let cum = 0;
+    for (let i = 0; i < samples.length; i++) {
+      const s = samples[i]!;
+      const d = (pose.x - s.x) ** 2 + (pose.y - s.y) ** 2;
+      if (d < bestDist) {
+        bestDist = d;
+        cumAtBest = cum;
+      }
+      if (i > 0) {
+        const prev = samples[i - 1]!;
+        cum += Math.hypot(s.x - prev.x, s.y - prev.y);
+      }
+    }
+    const total = cum || 1;
+    const t = cumAtBest / total;
+    const w = waypointWeights(t);
+    this.audio.updateAmbient({
+      village: w.village ?? 0,
+      forest: w.forest ?? 0,
+      lake: w.lakeside ?? 0,
+      fields: (w.farmland ?? 0) + (w.windmillFields ?? 0),
+    });
   }
 
   /** Stop timers (tests / hot reload). */

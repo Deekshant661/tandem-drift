@@ -9,3 +9,4 @@ export * from './world/types.js';
 export * from './world/spline.js';
 export * from './world/generate.js';
 export * from './world/willowbrook.js';
+export * from './world/fernvale.js';

@@ -86,7 +86,11 @@ export function Vehicle({
 
   const w = spec.wheels;
   return (
-    <group ref={root}>
+    // Visual-only scale bump: a deliberately toy-like, slightly oversized
+    // car reads better against Fernvale's real-asset buildings/vehicles
+    // than a realistic 1:1 scale would. Purely cosmetic — the planck.js
+    // collision body's dimensions (VEHICLE_TUNING) are entirely unaffected.
+    <group ref={root} scale={1.12}>
       <group ref={body}>
         {/* chassis */}
         <mesh castShadow position={[0, spec.chassis.yOffset, 0]}>
