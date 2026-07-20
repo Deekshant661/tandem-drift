@@ -3,6 +3,7 @@ import type { Checkpoint, TrackMap, WallSegment } from './types.js';
 import type { WorldMap } from '../world/types.js';
 import { worldToTrackMap } from '../world/generate.js';
 import { willowbrook } from '../world/willowbrook.js';
+import { fernvale } from '../world/fernvale.js';
 
 /** Chain a closed polygon of points into wall segments. */
 function ring(points: Array<[number, number]>): WallSegment[] {
@@ -75,13 +76,16 @@ export const PLAYABLE_MAPS: Record<string, () => TrackMap> = {
   track01,
   track02,
   willowbrook: () => worldToTrackMap(willowbrook()),
+  fernvale: () => worldToTrackMap(fernvale()),
 };
 
 export const DEFAULT_MAP = 'willowbrook';
 
 /** 3D world description for a map, or null for legacy 2D-only maps. */
 export function getWorld(name: string): WorldMap | null {
-  return name === 'willowbrook' ? willowbrook() : null;
+  if (name === 'willowbrook') return willowbrook();
+  if (name === 'fernvale') return fernvale();
+  return null;
 }
 
 /** Resolve a playable map by name, falling back to the default. */

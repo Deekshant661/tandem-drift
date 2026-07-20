@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { buildProp, FLOWER_COLORS } from './props.js';
 import type { PropKind, Placement } from './scatter.js';
 
-interface PartTemplate {
+export interface PartTemplate {
   geometry: THREE.BufferGeometry;
   material: THREE.Material;
   /** Transform of this mesh relative to the prop's own origin. */

@@ -3,8 +3,12 @@
 A browser-based cooperative multiplayer game where **two players drive one car**:
 the **pilot** steers, the **engineer** works the throttle, brake, and handbrake.
 Physics-based, server-authoritative, chaos guaranteed — now in **3D**: a React
-Three Fiber chase-camera view over the flat authoritative 2D sim, driving the
-cozy countryside loop of **Willowbrook** (Phase 2, see `phase2.md`).
+Three Fiber chase-camera view over the flat authoritative 2D sim. Two maps:
+**Fernvale**, a handcrafted ~800m showcase drive built with real Kenney (CC0)
+assets — village → farmland → forest → lake → windmill fields, one believable
+place with continuously blending atmosphere (Phase 3, see `phase3.md`) — and
+**Willowbrook**, the original procedurally-scattered countryside loop, kept as
+the regression/test map (Phase 2, see `phase2.md`).
 
 See [plan.md](plan.md) for the full architecture, tradeoffs, and milestone roadmap.
 
