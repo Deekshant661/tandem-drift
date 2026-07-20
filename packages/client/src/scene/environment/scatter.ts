@@ -14,7 +14,8 @@ export type PropKind =
   | 'bench'
   | 'mailbox'
   | 'crate'
-  | 'cone';
+  | 'cone'
+  | 'radioMast';
 
 export interface Placement {
   kind: PropKind;

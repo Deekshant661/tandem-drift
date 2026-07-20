@@ -37,6 +37,7 @@ describe('Fernvale scenery', () => {
       'lookout-bench',
       'hero-oak',
       'tower-base',
+      'radio-mast',
     ]) {
       expect(names).toContain(required);
     }

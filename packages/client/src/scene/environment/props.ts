@@ -212,6 +212,24 @@ function cone(): THREE.Object3D {
   return g;
 }
 
+/**
+ * A distant background silhouette — a tall thin mast with a small red
+ * warning light near the top. Breaks up a flat horizon stretch; not meant
+ * to ever be driven up to.
+ */
+function radioMast(): THREE.Object3D {
+  const g = new THREE.Group();
+  g.add(mesh(new THREE.CylinderGeometry(0.15, 0.3, 26, 6), '#9aa3ad', 13));
+  g.add(mesh(new THREE.CylinderGeometry(0.03, 0.08, 26, 4), '#7a828c', 13));
+  const light = new THREE.Mesh(
+    new THREE.SphereGeometry(0.4, 8, 8),
+    new THREE.MeshStandardMaterial({ color: '#ff3b3b', emissive: '#ff2020', emissiveIntensity: 1.4 }),
+  );
+  light.position.y = 25.6;
+  g.add(light);
+  return g;
+}
+
 /** Build a prop by kind. Houses cycle roof/color/flower palettes. */
 export function buildProp(kind: PropKind): THREE.Object3D {
   switch (kind) {
@@ -243,5 +261,7 @@ export function buildProp(kind: PropKind): THREE.Object3D {
       return crate();
     case 'cone':
       return cone();
+    case 'radioMast':
+      return radioMast();
   }
 }
